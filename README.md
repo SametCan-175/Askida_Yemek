@@ -1,5 +1,5 @@
 ﻿# Askida Yemek
-Agentic AI Destekli Gida Israfi Onleme Uygulamasi - TEKNOFEST 2026
+Agentic AI Destekli Gida Israfi Onleme Uygulamasi
 
 ## Ekip (7 Kisi)
 - Frontend (2 kisi) - React Native / Expo
