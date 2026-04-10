@@ -28,7 +28,7 @@ export default function LoginScreen() {
         {/* Not: Buraya kendi projenizdeki çantayı/logoyu tutan eller görselini eklemelisin. 
             Örnek: source={require('../assets/images/hero-image.png')} */}
         <Image
-          source={{ uri: 'https://via.placeholder.com/400x300/115545/FFFFFF?text=Gorsel+Alani' }}
+          source={require('../assets/login_logo.png')}
           style={styles.heroImage}
           resizeMode="contain"
         />
@@ -96,12 +96,16 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    width: '100%',
-    marginVertical: 20,
+    width: '110%',
+    alignSelf: 'center',
+    marginVertical: 0,        // margin kaldır
+    backgroundColor: '#F7F6F2', // arka planla aynı renk
   },
   heroImage: {
-    width: '100%',
-    height: '100%',
+    width: '100%',            // tam genişlik
+    height: undefined,
+    aspectRatio: 4/3,
+    marginHorizontal: -24,
   },
   buttonContainer: {
     paddingHorizontal: 24,
