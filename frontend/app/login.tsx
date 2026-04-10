@@ -1,4 +1,5 @@
 import React from 'react';
+import { router } from 'expo-router';
 import { 
   View, 
   Text, 
@@ -53,7 +54,11 @@ export default function LoginScreen() {
         </TouchableOpacity>
 
         {/* E-posta Butonu */}
-        <TouchableOpacity style={[styles.button, styles.emailButton]} activeOpacity={0.8}>
+        <TouchableOpacity 
+          style={[styles.button, styles.emailButton]} 
+          activeOpacity={0.8}
+          onPress={() => router.push('/email-login')} // YENİ EKLENEN KISIM
+        >
           <View style={styles.iconWrapper}>
             <MaterialCommunityIcons name="email-outline" size={24} color="#FFFFFF" />
           </View>
