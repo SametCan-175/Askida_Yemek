@@ -1,6 +1,10 @@
 ﻿groq
+<<<<<<< Updated upstream
 python-dotenv
 langchain
 langchain-groq
 jupyter
 pandas
+=======
+python-dotenv
+>>>>>>> Stashed changes
