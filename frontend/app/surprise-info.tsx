@@ -23,7 +23,7 @@ export default function SurpriseInfoScreen() {
 
         <View style={styles.imageContainer}>
           <Image
-            source={{ uri: 'https://via.placeholder.com/400x400/0A4D44/FFFFFF?text=Surpriz+Paket' }}
+            source={require('../assets/surpriz-paket.png')} 
             style={styles.image}
             resizeMode="contain"
           />
@@ -81,8 +81,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   image: {
-    width: '85%',
-    height: '85%',
+    width: '100%',
+    height: '100%',
+    transform: [{ scale: 1.2 }],
   },
   pagination: {
     flexDirection: 'row',

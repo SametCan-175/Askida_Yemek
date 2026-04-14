@@ -1,11 +1,16 @@
 ﻿{
   "expo": {
-    "name": "Askida Yemek",
-    "slug": "askida-yemek",
+    "name": "Son Lokma",
+    "slug": "son-lokma",
     "scheme": "askida-yemek",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/son-lokma-splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#27ae60"
+    },
     "plugins": [
       "expo-router"
     ],
@@ -14,7 +19,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#10b981"
+        "foregroundImage": "./assets/son-lokma-splash.png",
+        "backgroundColor": "#27ae60"
       }
     }
   }

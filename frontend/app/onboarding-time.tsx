@@ -20,26 +20,25 @@ const TIMES = [
 ];
 
 export default function OnboardingTimeScreen() {
-  const [selected, setSelected] = useState([]);
+  const [selected, setSelected] = useState<string[]>([]);
 
-  const toggleSelection = (time) => {
+  const toggleSelection = (time: string) => {
     if (selected.includes(time)) {
-      setSelected(selected.filter(item => item !== time));
+      setSelected(selected.filter((item) => item !== time));
     } else {
       setSelected([...selected, time]);
     }
   };
 
+  const isFinishDisabled = selected.length === 0;
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        
         <Text style={styles.title}>PAKETİNİ NE ZAMAN TESLİM ALMAK İSTERSİN?</Text>
-        
         <Text style={styles.description}>
           Bize tercih ettiğin teslimat aralığını söyle, rutinine en uygun Sürpriz Paketleri önerelim.
         </Text>
-        
         <Text style={styles.subtitle}>Sana uygun olanların tümünü seç</Text>
 
         <View style={styles.listContainer}>
@@ -47,7 +46,6 @@ export default function OnboardingTimeScreen() {
             <TouchableOpacity 
               key={index} 
               style={styles.optionRow}
-              activeOpacity={0.7}
               onPress={() => toggleSelection(time)}
             >
               <Text style={styles.optionText}>{time}</Text>
@@ -59,7 +57,6 @@ export default function OnboardingTimeScreen() {
             </TouchableOpacity>
           ))}
         </View>
-
       </ScrollView>
 
       <View style={styles.footer}>
@@ -75,10 +72,12 @@ export default function OnboardingTimeScreen() {
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={styles.nextButton}
-            onPress={() => console.log("Ana Ekrana Gidiliyor...")} 
+            style={[styles.nextButton, isFinishDisabled && styles.buttonDisabled]}
+            // İŞTE BURASI DEĞİŞTİ: Artık direkt ana ekrana (home) yönlendiriyor!
+            onPress={() => router.replace('/(tabs)')}
+            disabled={isFinishDisabled}
           >
-            <Text style={styles.nextButtonText}>Bitir</Text>
+            <Text style={[styles.nextButtonText, isFinishDisabled && styles.textDisabled]}>Bitir</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -94,7 +93,7 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 14, color: '#6B7280', textAlign: 'center', marginBottom: 30 },
   listContainer: { marginTop: 10 },
   optionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
-  optionText: { flex: 1, fontSize: 16, color: '#1f2937', paddingRight: 10 },
+  optionText: { flex: 1, fontSize: 16, color: '#1f2937' },
   footer: { paddingHorizontal: 20, paddingBottom: 30 },
   pagination: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 20 },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#D1D5DB' },
@@ -103,5 +102,7 @@ const styles = StyleSheet.create({
   backButton: { flex: 1, height: 56, borderRadius: 28, borderWidth: 2, borderColor: '#0A4D44', justifyContent: 'center', alignItems: 'center' },
   backButtonText: { color: '#0A4D44', fontSize: 16, fontWeight: '700' },
   nextButton: { flex: 1, height: 56, borderRadius: 28, backgroundColor: '#0A4D44', justifyContent: 'center', alignItems: 'center' },
-  nextButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' }
+  nextButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  buttonDisabled: { backgroundColor: '#D1D5DB' },
+  textDisabled: { color: '#9CA3AF' }
 });

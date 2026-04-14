@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
   headerText: {
     fontSize: 28,
     fontWeight: '900',
-    color: '#0A4D44', // Too Good To Go koyu yeşil tonu
+    color: '#0A4D44',
     letterSpacing: 0.5,
   },
   imageContainer: {
