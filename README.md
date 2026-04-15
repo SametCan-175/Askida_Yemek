@@ -1,5 +1,9 @@
 ﻿# Askida Yemek
+<<<<<<< HEAD
 Agentic AI Destekli Gida Israfi Onleme Uygulamasi 
+=======
+Agentic AI Destekli Gida Israfi Onleme Uygulamasi
+>>>>>>> origin/feature/backend-auth
 
 ## Ekip (7 Kisi)
 - Frontend (2 kisi) - React Native / Expo
