@@ -22,8 +22,8 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(shops.router, prefix="/shops", tags=["Shops"])
-app.include_router(listings.router, prefix="/listings", tags=["Listings"])
-app.include_router(ai_listings.router, prefix="/listings", tags=["AI"])
+app.include_router(ai_listings.router, prefix="/listings") # Önce özel rotaya baksın
+app.include_router(listings.router, prefix="/listings") # Bulamazsa genel ID rotasına baksın
 
 
 @app.get("/", tags=["Health"])
