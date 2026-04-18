@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import Base, engine
-from routers import auth, shops, listings, ai_listings
+from routers import auth, shops, listings, ai_listings, reservations
 
 Base.metadata.create_all(bind=engine)
 
@@ -22,10 +22,11 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(shops.router, prefix="/shops", tags=["Shops"])
-app.include_router(ai_listings.router, prefix="/listings") # Önce özel rotaya baksın
-app.include_router(listings.router, prefix="/listings") # Bulamazsa genel ID rotasına baksın
+app.include_router(listings.router, prefix="/listings", tags=["Listings"])
+app.include_router(ai_listings.router, prefix="/listings", tags=["AI"])
+app.include_router(reservations.router, prefix="/reservations", tags=["Reservations"])
 
 
 @app.get("/", tags=["Health"])
 def root():
-    return {"message": "Askıda Yemek API çalışıyor 🍽️"}
+    return {"message": "Askıda Yemek API çalışıyor"}

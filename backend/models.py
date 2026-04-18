@@ -5,7 +5,8 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
-from database import Base #- db dbyi kurunca değişebilir
+
+from database import Base
 
 
 class UserRole(str, enum.Enum):
@@ -48,6 +49,29 @@ class Shop(Base):
 
     owner = relationship("User", back_populates="shop")
     listings = relationship("Listing", back_populates="shop")
+
+
+class ReservationStatus(str, enum.Enum):
+    pending = "pending"       # Rezervasyon yapıldı
+    confirmed = "confirmed"   # İşletme onayladı
+    picked_up = "picked_up"   # Kullanıcı teslim aldı
+    cancelled = "cancelled"   # İptal edildi
+
+
+class Reservation(Base):
+    __tablename__ = "reservations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    listing_id = Column(Integer, ForeignKey("listings.id"), nullable=False)
+    quantity = Column(Integer, nullable=False, default=1)
+    status = Column(Enum(ReservationStatus), default=ReservationStatus.pending)
+    note = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    user = relationship("User", backref="reservations")
+    listing = relationship("Listing", backref="reservations")
 
 
 class ListingStatus(str, enum.Enum):
