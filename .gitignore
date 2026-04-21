@@ -1,0 +1,19 @@
+﻿# Askida Yemek
+Agentic AI Destekli
+@'
+node_modules/
+.expo/
+dist/
+build/
+*.log
+__pycache__/
+*.pyc
+.env
+.env.local
+.env.production
+*.pt
+*.h5
+*.pkl
+.DS_Store
+.vscode/
+.idea/

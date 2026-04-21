@@ -1,0 +1,11 @@
+﻿{
+  "expo": {
+    "name": "Askida Yemek",
+    "slug": "askida-yemek",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": { "supportsTablet": false },
+    "android": { "adaptiveIcon": { "backgroundColor": "#10b981" } }
+  }
+}
