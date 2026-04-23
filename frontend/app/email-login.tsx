@@ -24,7 +24,7 @@ export default function EmailLoginScreen() {
       // İşletme ise onboarding'i atla, direkt panele git
       // Not: Henüz bu dosyayı oluşturmadıysan hata verebilir, 
       // denemek için şimdilik profile sayfasına da yönlendirebilirsin.
-      router.push('/business-dashboard'); 
+      router.push('/store-setup'); 
     } else {
       // Müşteri ise normal onboarding akışına devam et
       router.push('/surprise-info');
