@@ -78,7 +78,7 @@ export default function BusinessDashboard() {
           <Text style={styles.welcomeText}>Hoş Geldiniz,</Text>
           <Text style={styles.headerName}>Trakya Pastanesi</Text>
         </View>
-        <TouchableOpacity style={styles.settingsBtn} onPress={() => router.push('/settings')}>
+        <TouchableOpacity style={styles.settingsBtn} onPress={() => router.push('/business/business-settings')}>
           <Ionicons name="settings-outline" size={26} color="#0A4D44" />
         </TouchableOpacity>
       </View>

@@ -33,7 +33,6 @@ export default function StoreSetupScreen() {
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status === 'granted') {
-        // İlk açılışta güncel konumu alıyoruz
         let curr = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         setLocation({
           latitude: curr.coords.latitude,
@@ -43,12 +42,9 @@ export default function StoreSetupScreen() {
     })();
   }, []);
 
-  // HIZLANDIRILMIŞ ANLIK KONUMA GİTME FONKSİYONU
   const goToMyLocation = async () => {
-    // 1. Gecikmeyi önlemek için cihazın önbelleğindeki son konumu al (Anında tepki verir)
     let curr = await Location.getLastKnownPositionAsync({});
 
-    // 2. Eğer önbellekte konum yoksa mecburen canlı çekeriz ama "Balanced" (Dengeli) ayarıyla hızlıca getiririz
     if (!curr) {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -98,7 +94,8 @@ export default function StoreSetupScreen() {
       Alert.alert("Eksik Bilgi", "Lütfen tüm alanları doldurun.");
       return;
     }
-    router.replace('/business-dashboard');
+    // DÜZELTİLEN YER: Artık Adım 2'ye gidiyor
+    router.push('/business/store-setup-step2');
   };
 
   return (
@@ -173,7 +170,7 @@ export default function StoreSetupScreen() {
           onPress={handleFinishSetup}
           disabled={!storeName || !selectedCategory || !location}
         >
-          <Text style={styles.continueButtonText}>Profili Tamamla</Text>
+          <Text style={styles.continueButtonText}>İleri</Text>
         </TouchableOpacity>
       </View>
 
@@ -192,8 +189,8 @@ export default function StoreSetupScreen() {
             <MapView 
               ref={mapRef} 
               style={{ flex: 1 }}
-              showsUserLocation={true} // CANLI MAVİ YUVARLAK BURADAN GELİYOR
-              showsMyLocationButton={false} // Kendi sağ alt butonumuzu kullandığımız için orijinalini gizledik
+              showsUserLocation={true} 
+              showsMyLocationButton={false} 
               initialRegion={{
                 latitude: location?.latitude || 41.6772, 
                 longitude: location?.longitude || 26.5550,
@@ -213,7 +210,6 @@ export default function StoreSetupScreen() {
               <View style={styles.markerShadow} />
             </View>
 
-            {/* ANLIK KONUMA GİT BUTONU */}
             <TouchableOpacity 
               style={styles.locateMeBtn}
               onPress={goToMyLocation}
