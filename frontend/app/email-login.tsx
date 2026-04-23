@@ -7,26 +7,43 @@ import {
   TouchableOpacity, 
   SafeAreaView 
 } from 'react-native';
-import { router } from 'expo-router';
+// useLocalSearchParams eklendi
+import { router, useLocalSearchParams } from 'expo-router'; 
 import { MaterialIcons } from '@expo/vector-icons';
 
 export default function EmailLoginScreen() {
   const [email, setEmail] = useState('');
   const [isChecked, setIsChecked] = useState(false);
+  
+  // 1. ADIM: Gelen rol parametresini yakalıyoruz
+  const { role } = useLocalSearchParams();
+
+  const handleContinue = () => {
+    // 2. ADIM: Rol kontrolü yaparak yönlendirme
+    if (role === 'business') {
+      // İşletme ise onboarding'i atla, direkt panele git
+      // Not: Henüz bu dosyayı oluşturmadıysan hata verebilir, 
+      // denemek için şimdilik profile sayfasına da yönlendirebilirsin.
+      router.push('/business-dashboard'); 
+    } else {
+      // Müşteri ise normal onboarding akışına devam et
+      router.push('/surprise-info');
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Üst Header Kısmı */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <MaterialIcons name="arrow-back-ios" size={20} color="#1f2937" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Kayıt ol veya giriş yap</Text>
+        <Text style={styles.headerTitle}>
+          {role === 'business' ? 'İşletme Girişi' : 'Kayıt ol veya giriş yap'}
+        </Text>
         <View style={{ width: 20 }} /> 
       </View>
 
       <View style={styles.content}>
-        {/* Email Input Alanı */}
         <Text style={styles.label}>E-posta</Text>
         <View style={styles.inputContainer}>
           <TextInput
@@ -40,7 +57,6 @@ export default function EmailLoginScreen() {
           />
         </View>
 
-        {/* Gizlilik Politikası Checkbox Alanı */}
         <TouchableOpacity 
           style={styles.checkboxContainer} 
           activeOpacity={0.7}
@@ -55,12 +71,11 @@ export default function EmailLoginScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Devam Butonu */}
       <View style={styles.footer}>
         <TouchableOpacity 
           style={[styles.continueButton, (email.length > 0 && isChecked) ? styles.buttonActive : styles.buttonInactive]}
           disabled={!(email.length > 0 && isChecked)}
-          onPress={() => router.push('/surprise-info')} 
+          onPress={handleContinue} // Değiştirilen fonksiyon
         >
           <Text style={[styles.continueButtonText, (email.length > 0 && isChecked) ? styles.textActive : styles.textInactive]}>
             Devam et
@@ -71,7 +86,7 @@ export default function EmailLoginScreen() {
   );
 }
 
-// Stiller bir öncekiyle tamamen aynı kalabilir
+// Stiller aynı kalabilir...
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, height: 60, marginTop: 10 },

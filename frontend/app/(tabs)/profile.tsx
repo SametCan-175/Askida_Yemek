@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { router } from 'expo-router'; // YÖNLENDİRME İÇİN EKLENDİ
 
 export default function ProfileScreen() {
   return (
@@ -9,7 +10,8 @@ export default function ProfileScreen() {
       <View style={styles.header}>
         <Ionicons name="happy-outline" size={32} color="#0A4D44" />
         <Text style={styles.headerName}>İsim ekle</Text>
-        <TouchableOpacity style={styles.settingsBtn}>
+        {/* İŞTE BURASI DEĞİŞTİ: Tıklayınca Ayarlara Gidiyor */}
+        <TouchableOpacity style={styles.settingsBtn} onPress={() => router.push('/settings')}>
           <Ionicons name="settings-outline" size={26} color="#0A4D44" />
         </TouchableOpacity>
       </View>
@@ -68,13 +70,11 @@ const styles = StyleSheet.create({
   headerName: { fontSize: 20, fontWeight: '800', color: '#111827', marginLeft: 12, flex: 1 },
   settingsBtn: { padding: 5 },
   scrollContent: { padding: 20 },
-
   emptyOrderSection: { alignItems: 'center', marginVertical: 30 },
   bagIconBg: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#F0F9F6', justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
   sectionTitle: { fontSize: 18, fontWeight: '800', color: '#111827', marginBottom: 6 },
   sectionDesc: { fontSize: 15, color: '#4B5563', marginBottom: 10 },
   linkText: { fontSize: 16, fontWeight: '700', color: '#0A4D44', textDecorationLine: 'underline' },
-
   inviteCard: { backgroundColor: '#0A4D44', borderRadius: 20, overflow: 'hidden' },
   inviteContent: { flexDirection: 'row', backgroundColor: '#F0F9F6', padding: 20, alignItems: 'center' },
   inviteTextContent: { flex: 1, paddingRight: 10 },
@@ -83,7 +83,6 @@ const styles = StyleSheet.create({
   voucherBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#A7D1C6' },
   voucherBadgeText: { marginLeft: 6, fontSize: 13, fontWeight: '700', color: '#0A4D44' },
   inviteImagePlaceholder: { width: 80, height: 80, justifyContent: 'center', alignItems: 'center' },
-
   promoBottom: { padding: 20, alignItems: 'center' },
   promoMainTitle: { fontSize: 22, fontWeight: '900', color: '#FFFFFF', textAlign: 'center', marginBottom: 12 },
   promoSub: { fontSize: 14, color: '#FFFFFF', textAlign: 'center', lineHeight: 20, opacity: 0.9, marginBottom: 20 },

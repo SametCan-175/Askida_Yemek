@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { router } from 'expo-router';
 import { 
   View, 
@@ -7,12 +7,28 @@ import {
   TouchableOpacity, 
   Image, 
   SafeAreaView, 
-  StatusBar 
+  StatusBar,
+  Modal 
 } from 'react-native';
-// İkonlar için Expo veya react-native-vector-icons kullanıldığını varsayıyoruz.
-import { FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
+import { FontAwesome5, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 
 export default function LoginScreen() {
+  // Modal'ın açık/kapalı durumunu tutacak state
+  const [isModalVisible, setModalVisible] = useState(false);
+
+  // İşletme seçildiğinde çalışacak fonksiyon
+  const handleBusinessSelection = () => {
+    setModalVisible(false);
+    // Rol bilgisini parametre olarak email-login sayfasına gönderiyoruz
+    router.push({ pathname: '/email-login', params: { role: 'business' } });
+  };
+
+  // Müşteri diğer seçeneğiyle devam etmek isterse
+  const handleCustomerSelection = () => {
+    setModalVisible(false);
+    router.push({ pathname: '/email-login', params: { role: 'customer' } });
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#F7F6F2" />
@@ -25,8 +41,6 @@ export default function LoginScreen() {
 
       {/* Görsel Alanı */}
       <View style={styles.imageContainer}>
-        {/* Not: Buraya kendi projenizdeki çantayı/logoyu tutan eller görselini eklemelisin. 
-            Örnek: source={require('../assets/images/hero-image.png')} */}
         <Image
           source={require('../assets/login_logo.png')}
           style={styles.heroImage}
@@ -37,7 +51,6 @@ export default function LoginScreen() {
       {/* Butonlar Alanı */}
       <View style={styles.buttonContainer}>
         
-        {/* Google Butonu */}
         <TouchableOpacity style={[styles.button, styles.googleButton]} activeOpacity={0.8}>
           <View style={styles.iconWrapper}>
             <FontAwesome5 name="google" size={20} color="#EA4335" />
@@ -45,7 +58,6 @@ export default function LoginScreen() {
           <Text style={[styles.buttonText, styles.googleButtonText]}>Google ile devam et</Text>
         </TouchableOpacity>
 
-        {/* Facebook Butonu */}
         <TouchableOpacity style={[styles.button, styles.facebookButton]} activeOpacity={0.8}>
           <View style={styles.iconWrapper}>
             <FontAwesome5 name="facebook-f" size={22} color="#FFFFFF" />
@@ -53,11 +65,10 @@ export default function LoginScreen() {
           <Text style={styles.buttonText}>Facebook ile devam et</Text>
         </TouchableOpacity>
 
-        {/* E-posta Butonu */}
         <TouchableOpacity 
           style={[styles.button, styles.emailButton]} 
           activeOpacity={0.8}
-          onPress={() => router.push('/email-login')} // YENİ EKLENEN KISIM
+          onPress={() => router.push({ pathname: '/email-login', params: { role: 'customer' } })}
         >
           <View style={styles.iconWrapper}>
             <MaterialCommunityIcons name="email-outline" size={24} color="#FFFFFF" />
@@ -65,12 +76,64 @@ export default function LoginScreen() {
           <Text style={styles.buttonText}>E-posta ile devam et</Text>
         </TouchableOpacity>
 
-        {/* Diğer Seçeneği */}
-        <TouchableOpacity style={styles.otherButton} activeOpacity={0.6}>
+        {/* Diğer Seçeneği - Tıklanınca Modal Açılacak */}
+        <TouchableOpacity 
+          style={styles.otherButton} 
+          activeOpacity={0.6}
+          onPress={() => setModalVisible(true)}
+        >
           <Text style={styles.otherButtonText}>Diğer</Text>
         </TouchableOpacity>
 
       </View>
+
+      {/* Rol Seçim Modalı (Alttan Açılır Menü) */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isModalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setModalVisible(false)}
+        >
+          <TouchableOpacity activeOpacity={1} style={styles.modalContent}>
+            
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Nasıl Devam Etmek İstersin?</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#111827" />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity style={styles.roleButton} onPress={handleCustomerSelection}>
+              <View style={styles.roleIconBg}>
+                <Ionicons name="person-outline" size={24} color="#0A4D44" />
+              </View>
+              <View style={styles.roleTextContainer}>
+                <Text style={styles.roleTitle}>Müşteri Olacağım</Text>
+                <Text style={styles.roleDesc}>Yemek kurtarmak ve fırsatları görmek istiyorum</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.roleButton, { borderBottomWidth: 0 }]} onPress={handleBusinessSelection}>
+              <View style={styles.roleIconBg}>
+                <Ionicons name="storefront-outline" size={24} color="#0A4D44" />
+              </View>
+              <View style={styles.roleTextContainer}>
+                <Text style={styles.roleTitle}>İşletme Olacağım</Text>
+                <Text style={styles.roleDesc}>Fazla yemeklerimi sürpriz paket olarak satmak istiyorum</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+            </TouchableOpacity>
+
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -78,7 +141,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7F6F2', // Görseldeki krem/kırık beyaz arka plan
+    backgroundColor: '#F7F6F2',
     justifyContent: 'space-between',
   },
   headerContainer: {
@@ -98,11 +161,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '110%',
     alignSelf: 'center',
-    marginVertical: 0,        // margin kaldır
-    backgroundColor: '#F7F6F2', // arka planla aynı renk
+    marginVertical: 0,
+    backgroundColor: '#F7F6F2',
   },
   heroImage: {
-    width: '100%',            // tam genişlik
+    width: '100%',
     height: undefined,
     aspectRatio: 4/3,
     marginHorizontal: -24,
@@ -110,19 +173,19 @@ const styles = StyleSheet.create({
   buttonContainer: {
     paddingHorizontal: 24,
     paddingBottom: 40,
-    gap: 16, // React Native 0.71+ ile butonlar arası boşluk için
+    gap: 16,
   },
   button: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     height: 56,
-    borderRadius: 28, // Tam yuvarlak köşeler (hap şekli)
+    borderRadius: 28,
     paddingHorizontal: 20,
   },
   iconWrapper: {
     position: 'absolute',
-    left: 24, // İkonları sola sabitler
+    left: 24,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -140,10 +203,10 @@ const styles = StyleSheet.create({
     color: '#0A4D44',
   },
   facebookButton: {
-    backgroundColor: '#1877F2', // Facebook orijinal mavisi
+    backgroundColor: '#1877F2',
   },
   emailButton: {
-    backgroundColor: '#0A4D44', // Koyu yeşil
+    backgroundColor: '#0A4D44',
   },
   otherButton: {
     alignItems: 'center',
@@ -153,6 +216,62 @@ const styles = StyleSheet.create({
   otherButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#A0AAB2', // Görseldeki açık gri ton
+    color: '#A0AAB2',
+  },
+  
+  // EKLENEN MODAL STİLLERİ
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)', // Arka planı hafif karartır
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  roleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  roleIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F0F9F6', // Projendeki açık yeşil ton
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  roleTextContainer: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  roleTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  roleDesc: {
+    fontSize: 13,
+    color: '#6B7280',
+    lineHeight: 18,
   },
 });
