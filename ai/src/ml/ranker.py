@@ -11,7 +11,8 @@ def feed_ranker(firsatlar):
         mesafe_skoru = max(0, 100 - (firsat.get("mesafe_km", 0) * 10))
 
         # Stok aciliyeti (Stok azsa puan yükselir)
-        stok_skoru = max(10, 110 - (firsat.get("stok", 5) * 10))
+        # Batuhan'ın API'si "adet" gönderiyor
+        stok_skoru = max(10, 110 - (firsat.get("adet", 5) * 10))
 
         # Final Skor
         final_skor = (indirim_skoru * 0.4) + (stok_skoru * 0.4) + (mesafe_skoru * 0.2)
