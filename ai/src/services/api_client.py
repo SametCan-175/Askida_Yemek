@@ -25,8 +25,15 @@ class AIListingService:
 
             response.raise_for_status()
             data = response.json()
-            logger.info(f"✅ {len(data)} adet listing çekildi.")
-            return data
+
+            # Batuhan'ın API'si {"user_id": ..., "listings": [...]} formatında döndürüyor
+            if isinstance(data, dict) and "listings" in data:
+                listings = data["listings"]
+            else:
+                listings = data  # Direkt liste dönerse de çalışır
+
+            logger.info(f"✅ {len(listings)} adet listing çekildi.")
+            return listings
 
         except requests.exceptions.RequestException as e:
             logger.error(f"❌ Listing çekme hatası: {str(e)}")
@@ -53,7 +60,8 @@ class AIListingService:
         try:
             url = f"{self.base_url}/listings/ai-scores"
             logger.info(f"📤 {len(sonuclar)} skor backend'e gönderiliyor...")
-            response = requests.post(url, json=sonuclar)
+            # Batuhan'ın endpoint'i {"scores": [...]} formatı bekliyor
+            response = requests.post(url, json={"scores": sonuclar})
 
             if response.status_code == 422:
                 logger.error(f"422 Hatası: {response.json()}")
@@ -79,4 +87,52 @@ class AIListingService:
             return response.json()
         except requests.exceptions.RequestException as e:
             logger.error(f"❌ Sipariş bildirimi hatası: {str(e)}")
+            return None
+
+    def post_rozet_sonucu(self, user_id: int, rozet_sonucu: dict):
+        """
+        rozet.py'den gelen sonucu backend'e gönderir.
+        Batuhan bunu alıp kullanıcının rozet listesini günceller,
+        frontend de oradan gösterir.
+
+        Beklenen format:
+        {
+            "user_id": 1,
+            "yeni_rozetler": [
+                {
+                    "id": "firsat_avcisi",
+                    "ad": "Fırsat Avcısı",
+                    "emoji": "🎯",
+                    "aciklama": "5 sipariş tamamladın!"
+                }
+            ],
+            "kutlama_mesaji": "Tebrikler! Fırsat Avcısı rozetini kazandın! 🎯",
+            "siradaki_rozet": {
+                "ad": "İsraf Önleyici",
+                "kalan_siparis": 5
+            }
+        }
+        """
+        if not rozet_sonucu.get("yeni_rozetler"):
+            logger.info("ℹ️ Yeni rozet yok, gönderim yapılmadı.")
+            return None
+
+        try:
+            url = f"{self.base_url}/users/rozetler"
+            payload = {
+                "user_id": user_id,
+                **rozet_sonucu
+            }
+            logger.info(f"🏅 {len(rozet_sonucu['yeni_rozetler'])} rozet backend'e gönderiliyor...")
+            response = requests.post(url, json=payload)
+
+            if response.status_code == 422:
+                logger.error(f"422 Hatası: {response.json()}")
+
+            response.raise_for_status()
+            logger.info(f"✅ Rozet sonucu backend'e iletildi → user:{user_id}")
+            return response.json()
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"❌ Rozet gönderme hatası: {str(e)}")
             return None

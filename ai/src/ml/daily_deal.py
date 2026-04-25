@@ -126,7 +126,74 @@ Fırsat skoru: {en_iyi['firsat_skoru']}
     }
 
 
+def run():
+    """
+    APScheduler tarafından her gün 08:00'de otomatik çağrılır.
+    Batuhan'ın scheduler'ı: scheduler.add_job(daily_deal.run, 'cron', hour=8)
+    """
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+    print(f"\n[AJAN 7] {datetime.now().strftime('%d.%m.%Y %H:%M')} — Günün fırsatı hesaplanıyor...")
+
+    try:
+        from services.api_client import AIListingService
+        service = AIListingService()
+
+        # Batuhan'ın API'sinden aktif ilanları çek
+        # Merkezi bir konum kullanıyoruz (şehir merkezi gibi)
+        urun_listesi = service.fetch_targeted_listings(
+            latitude=41.010,
+            longitude=29.010,
+            radius=10.0  # Günün fırsatı için daha geniş radius
+        )
+
+        if not urun_listesi:
+            print("[AJAN 7] API'den ilan gelmedi, test verisiyle devam ediliyor...")
+            raise Exception("Boş liste")
+
+        # API formatını daily_deal formatına çevir
+        donusturulmus = []
+        for u in urun_listesi:
+            donusturulmus.append({
+                "id": u.get("id"),
+                "kafe": u.get("kafe", ""),
+                "urun": u.get("urun", ""),
+                "fiyat": u.get("fiyat", 100),
+                "indirim": u.get("indirim_orani", 0),
+                "adet": u.get("adet", 0),
+                "yildiz": 4.0  # Batuhan yıldız ekleyene kadar sabit
+            })
+
+        sonuc = ajan7_gunun_firsati(donusturulmus)
+
+    except Exception as e:
+        print(f"[AJAN 7] API hatası ({e}), test verisiyle çalışıyor...")
+
+        # Fallback: test verisiyle çalış
+        test_urunler = [
+            {"id": "u1", "kafe": "Merkez Kafe", "urun": "Karışık Sandviç",
+             "fiyat": 120, "indirim": 40, "adet": 5, "yildiz": 4.2},
+            {"id": "u2", "kafe": "Green Bowl", "urun": "Vegan Avokado Wrap",
+             "fiyat": 150, "indirim": 55, "adet": 2, "yildiz": 4.8},
+            {"id": "u3", "kafe": "Kampüs Bistro", "urun": "Mercimek Çorbası",
+             "fiyat": 80, "indirim": 60, "adet": 1, "yildiz": 4.5},
+        ]
+        sonuc = ajan7_gunun_firsati(test_urunler)
+
+    if sonuc["firsat"]:
+        f = sonuc["firsat"]
+        print(f"[AJAN 7] ✅ Günün fırsatı: {f['urun']} — {f['kafe']} ({f['firsat_skoru']} puan)")
+        print(f"[AJAN 7] 📲 Kart metni: {sonuc['kart_metni']}")
+    else:
+        print("[AJAN 7] ⚠️ Bugün uygun fırsat bulunamadı.")
+
+    return sonuc
+
+
 if __name__ == "__main__":
+
     test_urunler = [
         {
             "id": "u1", "kafe": "Merkez Kafe", "urun": "Karışık Sandviç",
