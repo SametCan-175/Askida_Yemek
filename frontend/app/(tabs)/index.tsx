@@ -14,6 +14,7 @@ import { router } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
+// 1. DEĞİŞİKLİK: Örnek verilere 'badge_text' eklendi
 const SURPRISE_BAGS = [
   {
     id: '1',
@@ -21,7 +22,8 @@ const SURPRISE_BAGS = [
     description: 'Taze simit, poğaça ve unlu mamuller',
     time: 'Bugün: 19:30 - 20:30',
     distance: '1.2 km',
-    stock: 5, // Fiyat yerine stok ekledik
+    stock: 5, 
+    badge_text: 'TÜKENİYOR', // Backend'den gelecek dinamik veri
     image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=500&q=60',
     logo: 'https://images.unsplash.com/photo-1555507036-ab1d4075c6f1?auto=format&fit=crop&w=100&q=60'
   },
@@ -32,6 +34,7 @@ const SURPRISE_BAGS = [
     time: 'Bugün: 15:00 - 16:00',
     distance: '0.5 km',
     stock: 12,
+    badge_text: 'YENİ', // Backend'den gelecek dinamik veri
     image: 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=500&q=60',
     logo: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=100&q=60'
   },
@@ -63,9 +66,14 @@ export default function Index() {
           >
             <View style={styles.imageContainer}>
               <Image source={{ uri: item.image }} style={styles.cardImage} />
-              <View style={styles.newBadge}>
-                <Text style={styles.newBadgeText}>YENİ</Text>
-              </View>
+              
+              {/* 2. DEĞİŞİKLİK: Sadece badge_text doluysa rozeti göster ve içine bu yazıyı bas */}
+              {item.badge_text ? (
+                <View style={styles.newBadge}>
+                  <Text style={styles.newBadgeText}>{item.badge_text}</Text>
+                </View>
+              ) : null}
+
               <View style={styles.logoContainer}>
                 <Image source={{ uri: item.logo }} style={styles.storeLogo} />
               </View>
@@ -88,7 +96,6 @@ export default function Index() {
                   <Text style={styles.infoText}>{item.time}</Text>
                 </View>
 
-                {/* İNDİRİMLİ FİYAT YERİNE STOK BİLGİSİ GELDİ */}
                 <View style={styles.stockBadge}>
                   <Text style={styles.stockText}>{item.stock} Ürün Kaldı</Text>
                 </View>
@@ -112,8 +119,11 @@ const styles = StyleSheet.create({
   card: { backgroundColor: '#FFFFFF', borderRadius: 25, marginBottom: 25, overflow: 'hidden', elevation: 4 },
   imageContainer: { width: '100%', height: 180 },
   cardImage: { width: '100%', height: '100%' },
+  
+  // Rozet Stili
   newBadge: { position: 'absolute', top: 12, left: 12, backgroundColor: '#FFFFFF', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
-  newBadgeText: { fontSize: 11, fontWeight: '800', color: '#0A4D44' },
+  newBadgeText: { fontSize: 11, fontWeight: '900', color: '#0A4D44', textTransform: 'uppercase' }, // Yazıyı biraz daha kalın ve büyük harf yaptık
+  
   logoContainer: { position: 'absolute', bottom: -20, left: 20, padding: 3, backgroundColor: '#FFFFFF', borderRadius: 15, elevation: 5 },
   storeLogo: { width: 50, height: 50, borderRadius: 12 },
   
@@ -128,7 +138,6 @@ const styles = StyleSheet.create({
   infoGroup: { flexDirection: 'row', alignItems: 'center' },
   infoText: { marginLeft: 6, fontSize: 13, color: '#4B5563', fontWeight: '500' },
 
-  // Yeni Stok Rozeti Tasarımı
   stockBadge: { 
     backgroundColor: '#F0F9F6', 
     paddingHorizontal: 12, 

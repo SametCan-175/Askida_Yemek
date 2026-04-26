@@ -39,7 +39,6 @@ export default function ShopDetailScreen() {
     }));
   };
 
-  // Hata veren dış link yerine direkt browse sekmesine yönlendiriyoruz
   const openMap = () => {
     router.push('/browse');
   };
@@ -99,7 +98,7 @@ export default function ShopDetailScreen() {
 
           <View style={styles.divider} />
 
-          {/* İşletme Konumu - Browse'a yönlendirir */}
+          {/* İşletme Konumu */}
           <Text style={styles.sectionTitle}>İşletme Konumu</Text>
           <TouchableOpacity 
             style={styles.mapBox} 
@@ -152,11 +151,19 @@ export default function ShopDetailScreen() {
         <TouchableOpacity 
           style={[styles.reserveButton, totalItems === 0 && { backgroundColor: '#D1D5DB' }]} 
           disabled={totalItems === 0}
+          onPress={() => router.push({
+            pathname: '/shop/checkout',
+            params: { 
+              storeName: name, 
+              totalItems: totalItems, 
+              totalPrice: totalPrice.toFixed(2) 
+            }
+          })}
         >
           <Text style={styles.reserveButtonText}>Devam Et</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </View> 
   );
 }
 

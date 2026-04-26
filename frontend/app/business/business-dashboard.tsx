@@ -91,10 +91,16 @@ export default function BusinessDashboard() {
             <Text style={styles.statLabel}>Kalan Paket</Text>
             <Text style={styles.statValue}>{stocks.reduce((acc, curr) => acc + curr.count, 0)}</Text>
           </View>
-          <View style={styles.card}>
+          
+          {/* İŞTE BURASI DEĞİŞTİ: Tıklanabilir Cüzdan Kartı */}
+          <TouchableOpacity 
+            style={styles.card} 
+            activeOpacity={0.8}
+            onPress={() => router.push('/business/wallet')}
+          >
             <Text style={styles.statLabel}>Günlük Kazanç</Text>
             <Text style={[styles.statValue, { color: '#10B981' }]}>330.00₺</Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* ANA AKSİYON: QR OKUTMA (profile.tsx'deki davet kartına benzer) */}
@@ -117,7 +123,7 @@ export default function BusinessDashboard() {
         {/* Stok Yönetimi Başlığı (index.tsx ile uyumlu) */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Aktif Stoklar</Text>
-          <TouchableOpacity onPress={() => Alert.alert('Bilgi', 'Buradan yeni ürün ekleme sayfasına gidilecek.')}>
+          <TouchableOpacity onPress={() => router.push('/business/add-product')}>
             <Text style={styles.seeAllText}>+ Yeni Ekle</Text>
           </TouchableOpacity>
         </View>

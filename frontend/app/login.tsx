@@ -7,27 +7,12 @@ import {
   TouchableOpacity, 
   Image, 
   SafeAreaView, 
-  StatusBar,
-  Modal 
+  StatusBar 
 } from 'react-native';
 import { FontAwesome5, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 
 export default function LoginScreen() {
-  // Modal'ın açık/kapalı durumunu tutacak state
-  const [isModalVisible, setModalVisible] = useState(false);
-
-  // İşletme seçildiğinde çalışacak fonksiyon
-  const handleBusinessSelection = () => {
-    setModalVisible(false);
-    // Rol bilgisini parametre olarak email-login sayfasına gönderiyoruz
-    router.push({ pathname: '/email-login', params: { role: 'business' } });
-  };
-
-  // Müşteri diğer seçeneğiyle devam etmek isterse
-  const handleCustomerSelection = () => {
-    setModalVisible(false);
-    router.push({ pathname: '/email-login', params: { role: 'customer' } });
-  };
+  const [selectedRole, setSelectedRole] = useState<'customer' | 'business' | null>(null);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -48,67 +33,17 @@ export default function LoginScreen() {
         />
       </View>
 
-      {/* Butonlar Alanı */}
-      <View style={styles.buttonContainer}>
-        
-        <TouchableOpacity style={[styles.button, styles.googleButton]} activeOpacity={0.8}>
-          <View style={styles.iconWrapper}>
-            <FontAwesome5 name="google" size={20} color="#EA4335" />
-          </View>
-          <Text style={[styles.buttonText, styles.googleButtonText]}>Google ile devam et</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={[styles.button, styles.facebookButton]} activeOpacity={0.8}>
-          <View style={styles.iconWrapper}>
-            <FontAwesome5 name="facebook-f" size={22} color="#FFFFFF" />
-          </View>
-          <Text style={styles.buttonText}>Facebook ile devam et</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.button, styles.emailButton]} 
-          activeOpacity={0.8}
-          onPress={() => router.push({ pathname: '/email-login', params: { role: 'customer' } })}
-        >
-          <View style={styles.iconWrapper}>
-            <MaterialCommunityIcons name="email-outline" size={24} color="#FFFFFF" />
-          </View>
-          <Text style={styles.buttonText}>E-posta ile devam et</Text>
-        </TouchableOpacity>
-
-        {/* Diğer Seçeneği - Tıklanınca Modal Açılacak */}
-        <TouchableOpacity 
-          style={styles.otherButton} 
-          activeOpacity={0.6}
-          onPress={() => setModalVisible(true)}
-        >
-          <Text style={styles.otherButtonText}>Diğer</Text>
-        </TouchableOpacity>
-
-      </View>
-
-      {/* Rol Seçim Modalı (Alttan Açılır Menü) */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={isModalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <TouchableOpacity 
-          style={styles.modalOverlay} 
-          activeOpacity={1} 
-          onPress={() => setModalVisible(false)}
-        >
-          <TouchableOpacity activeOpacity={1} style={styles.modalContent}>
+      {/* Alt İçerik Alanı */}
+      <View style={styles.bottomContainer}>
+        {!selectedRole ? (
+          <View style={styles.roleSelectionContainer}>
+            <Text style={styles.sectionTitle}>Nasıl devam etmek istersin?</Text>
             
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Nasıl Devam Etmek İstersin?</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={24} color="#111827" />
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity style={styles.roleButton} onPress={handleCustomerSelection}>
+            <TouchableOpacity 
+              style={styles.roleCard} 
+              activeOpacity={0.8}
+              onPress={() => setSelectedRole('customer')}
+            >
               <View style={styles.roleIconBg}>
                 <Ionicons name="person-outline" size={24} color="#0A4D44" />
               </View>
@@ -119,21 +54,66 @@ export default function LoginScreen() {
               <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.roleButton, { borderBottomWidth: 0 }]} onPress={handleBusinessSelection}>
+            <TouchableOpacity 
+              style={styles.roleCard} 
+              activeOpacity={0.8}
+              onPress={() => setSelectedRole('business')}
+            >
               <View style={styles.roleIconBg}>
                 <Ionicons name="storefront-outline" size={24} color="#0A4D44" />
               </View>
               <View style={styles.roleTextContainer}>
                 <Text style={styles.roleTitle}>İşletme Olacağım</Text>
-                <Text style={styles.roleDesc}>Fazla yemeklerimi sürpriz paket olarak satmak istiyorum</Text>
+                <Text style={styles.roleDesc}>Fazla ürünlerimi değerlendirmek ve israfın önüne geçmek istiyorum.</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
             </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.authContainer}>
+            <View style={styles.authHeader}>
+              {/* Şık ve Modern Geri Butonu */}
+              <TouchableOpacity onPress={() => setSelectedRole(null)} style={styles.backButtonCircle}>
+                <Ionicons name="chevron-back" size={22} color="#111827" />
+              </TouchableOpacity>
+              <Text style={styles.authTitle}>
+                {selectedRole === 'customer' ? 'Müşteri Girişi' : 'İşletme Girişi'}
+              </Text>
+              <View style={{ width: 40 }} />
+            </View>
 
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+            {/* Google Butonu - Renkli Logo ile */}
+            <TouchableOpacity style={[styles.button, styles.googleButton]} activeOpacity={0.8}>
+              <View style={styles.iconWrapper}>
+                <Image 
+                  source={require('../assets/google_logo.png')} 
+                  style={{ width: 22, height: 22 }}
+                  resizeMode="contain"
+                />
+              </View>
+              <Text style={[styles.buttonText, styles.googleButtonText]}>Google ile devam et</Text>
+            </TouchableOpacity>
 
+            <TouchableOpacity style={[styles.button, styles.facebookButton]} activeOpacity={0.8}>
+              <View style={styles.iconWrapper}>
+                <FontAwesome5 name="facebook-f" size={22} color="#FFFFFF" />
+              </View>
+              <Text style={styles.buttonText}>Facebook ile devam et</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.button, styles.emailButton]} 
+              activeOpacity={0.8}
+              onPress={() => router.push({ pathname: '/email-login', params: { role: selectedRole } })}
+            >
+              <View style={styles.iconWrapper}>
+                <MaterialCommunityIcons name="email-outline" size={24} color="#FFFFFF" />
+              </View>
+              <Text style={styles.buttonText}>E-posta ile devam et</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
     </SafeAreaView>
   );
 }
@@ -162,7 +142,6 @@ const styles = StyleSheet.create({
     width: '110%',
     alignSelf: 'center',
     marginVertical: 0,
-    backgroundColor: '#F7F6F2',
   },
   heroImage: {
     width: '100%',
@@ -170,10 +149,83 @@ const styles = StyleSheet.create({
     aspectRatio: 4/3,
     marginHorizontal: -24,
   },
-  buttonContainer: {
+  bottomContainer: {
     paddingHorizontal: 24,
     paddingBottom: 40,
+    minHeight: 260,
+    justifyContent: 'flex-end',
+  },
+  roleSelectionContainer: {
+    width: '100%',
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#6B7280',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  roleCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  roleIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F0F9F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  roleTextContainer: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  roleTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  roleDesc: {
+    fontSize: 13,
+    color: '#6B7280',
+    lineHeight: 18,
+  },
+  authContainer: {
+    width: '100%',
     gap: 16,
+  },
+  authHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  backButtonCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  authTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#111827',
   },
   button: {
     flexDirection: 'row',
@@ -186,8 +238,9 @@ const styles = StyleSheet.create({
   iconWrapper: {
     position: 'absolute',
     left: 24,
+    width: 24, // Tüm ikonları hizalamak için sabit genişlik
+    alignItems: 'center', // İkonu/resmi ortala
     justifyContent: 'center',
-    alignItems: 'center',
   },
   buttonText: {
     fontSize: 16,
@@ -207,71 +260,5 @@ const styles = StyleSheet.create({
   },
   emailButton: {
     backgroundColor: '#0A4D44',
-  },
-  otherButton: {
-    alignItems: 'center',
-    marginTop: 8,
-    paddingVertical: 10,
-  },
-  otherButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#A0AAB2',
-  },
-  
-  // EKLENEN MODAL STİLLERİ
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)', // Arka planı hafif karartır
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    paddingBottom: 40,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#111827',
-  },
-  roleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  roleIconBg: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#F0F9F6', // Projendeki açık yeşil ton
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  roleTextContainer: {
-    flex: 1,
-    paddingRight: 10,
-  },
-  roleTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  roleDesc: {
-    fontSize: 13,
-    color: '#6B7280',
-    lineHeight: 18,
   },
 });
