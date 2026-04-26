@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 
 from database import get_db
@@ -50,7 +50,7 @@ def save_ai_scores(
     for item in payload.scores:
         listing = db.query(Listing).filter(Listing.id == item.listing_id).first()
         if not listing:
-            continue 
+            continue  # Olmayan ilan varsa atla, hata döndürme
 
         existing = db.query(ListingAiScore).filter(
             ListingAiScore.listing_id == item.listing_id
@@ -119,4 +119,68 @@ def siparis_tamamlandi(
         "toplam_tasarruf_tl": round(toplam_tasarruf, 2),
         "en_cok_siparis_kategori": en_cok_kategori,
         "kategori_dagilimi": kategori_sayac,
+    }
+
+class DestekMesaj(BaseModel):
+    user_id: int
+    mesaj: str
+    konusma_gecmisi: List[Dict[str, Any]] = []
+
+
+@router.post("/ai/destek")
+def canli_destek(
+    payload: DestekMesaj,
+    db: Session = Depends(get_db),
+):
+    """
+    Canlı destek endpoint'i. AI modülü bu endpoint'ten kullanıcı mesajını alır,
+    konuşma geçmişiyle birlikte işler ve yanıt üretir.
+
+    Örnek istek:
+    {
+        "user_id": 1,
+        "mesaj": "Siparişim nerede?",
+        "konusma_gecmisi": [
+            {"rol": "kullanici", "icerik": "Merhaba"},
+            {"rol": "asistan", "icerik": "Merhaba! Size nasıl yardımcı olabilirim?"}
+        ]
+    }
+
+    Backend şunları ekler:
+    - Kullanıcının son rezervasyonları (AI bağlam için kullanır)
+    - Kullanıcı adı
+    """
+    user = db.query(User).filter(User.id == payload.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
+
+    # Kullanıcının son 5 rezervasyonunu bağlam olarak ekle
+    from models import Reservation
+    son_rezervasyonlar = (
+        db.query(Reservation)
+        .filter(Reservation.user_id == payload.user_id)
+        .order_by(Reservation.created_at.desc())
+        .limit(5)
+        .all()
+    )
+
+    baglam = [
+        {
+            "rezervasyon_id": r.id,
+            "durum": r.status,
+            "listing_id": r.listing_id,
+            "adet": r.quantity,
+            "tarih": r.created_at.isoformat(),
+        }
+        for r in son_rezervasyonlar
+    ]
+
+    return {
+        "user_id": payload.user_id,
+        "kullanici_adi": user.full_name,
+        "mesaj": payload.mesaj,
+        "konusma_gecmisi": payload.konusma_gecmisi,
+        "baglam": {
+            "son_rezervasyonlar": baglam,
+        },
     }
