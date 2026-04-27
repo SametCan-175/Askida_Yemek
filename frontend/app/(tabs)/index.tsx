@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -7,14 +7,29 @@ import {
   ScrollView, 
   TouchableOpacity, 
   Image,
-  Dimensions 
+  Dimensions,
+  Platform,
+  LogBox // 1. EKLENDİ: Uyarıları gizlemek için
 } from 'react-native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
 
 const { width } = Dimensions.get('window');
 
-// 1. DEĞİŞİKLİK: Örnek verilere 'badge_text' eklendi
+// 2. EKLENDİ: Alttan çıkan o minik Expo Go push bildirim uyarısını tamamen gizler!
+LogBox.ignoreLogs(['expo-notifications: Android Push notifications']);
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true, 
+    shouldShowList: true,   
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
 const SURPRISE_BAGS = [
   {
     id: '1',
@@ -23,7 +38,7 @@ const SURPRISE_BAGS = [
     time: 'Bugün: 19:30 - 20:30',
     distance: '1.2 km',
     stock: 5, 
-    badge_text: 'TÜKENİYOR', // Backend'den gelecek dinamik veri
+    badge_text: 'TÜKENİYOR',
     image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=500&q=60',
     logo: 'https://images.unsplash.com/photo-1555507036-ab1d4075c6f1?auto=format&fit=crop&w=100&q=60'
   },
@@ -34,13 +49,27 @@ const SURPRISE_BAGS = [
     time: 'Bugün: 15:00 - 16:00',
     distance: '0.5 km',
     stock: 12,
-    badge_text: 'YENİ', // Backend'den gelecek dinamik veri
+    badge_text: 'YENİ',
     image: 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=500&q=60',
     logo: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=100&q=60'
   },
 ];
 
 export default function Index() {
+  const [expoPushToken, setExpoPushToken] = useState('');
+
+  useEffect(() => {
+    async function initNotifications() {
+      try {
+        const token = await registerForPushNotificationsAsync();
+        if (token) setExpoPushToken(token);
+      } catch (error) {
+        console.log("Bildirim kurulumu atlandı.");
+      }
+    }
+    initNotifications();
+  }, []);
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -48,7 +77,10 @@ export default function Index() {
           <Text style={styles.headerSubtitle}>Keşan, Edirne</Text>
           <Text style={styles.headerTitle}>Bugün Ne Kurtarıyoruz?</Text>
         </View>
-        <TouchableOpacity style={styles.profileIcon}>
+        <TouchableOpacity 
+          style={styles.profileIcon} 
+          onPress={() => alert(expoPushToken ? `Token: ${expoPushToken}` : "Token: Expo Go kısıtlaması nedeniyle alınamadı.")}
+        >
           <Ionicons name="notifications-outline" size={24} color="#111827" />
         </TouchableOpacity>
       </View>
@@ -67,7 +99,6 @@ export default function Index() {
             <View style={styles.imageContainer}>
               <Image source={{ uri: item.image }} style={styles.cardImage} />
               
-              {/* 2. DEĞİŞİKLİK: Sadece badge_text doluysa rozeti göster ve içine bu yazıyı bas */}
               {item.badge_text ? (
                 <View style={styles.newBadge}>
                   <Text style={styles.newBadgeText}>{item.badge_text}</Text>
@@ -108,6 +139,39 @@ export default function Index() {
   );
 }
 
+async function registerForPushNotificationsAsync() {
+  if (!Device.isDevice) return null;
+
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'default',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#0A4D44',
+    });
+  }
+
+  const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  let finalStatus = existingStatus;
+  
+  if (existingStatus !== 'granted') {
+    const { status } = await Notifications.requestPermissionsAsync();
+    finalStatus = status;
+  }
+  
+  if (finalStatus !== 'granted') return null;
+
+  try {
+    const tokenData = await Notifications.getExpoPushTokenAsync({
+      projectId: "proje-id-buraya-gelecek" 
+    });
+    return tokenData.data;
+  } catch (e) {
+    console.log("Expo Go push uyarısı yakalandı ve engellendi.");
+    return null;
+  }
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   header: { padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -115,40 +179,22 @@ const styles = StyleSheet.create({
   headerSubtitle: { fontSize: 13, color: '#6B7280', fontWeight: '600' },
   profileIcon: { padding: 10, backgroundColor: '#FFFFFF', borderRadius: 15, elevation: 2 },
   scrollContent: { padding: 20, paddingBottom: 100 },
-  
   card: { backgroundColor: '#FFFFFF', borderRadius: 25, marginBottom: 25, overflow: 'hidden', elevation: 4 },
   imageContainer: { width: '100%', height: 180 },
   cardImage: { width: '100%', height: '100%' },
-  
-  // Rozet Stili
   newBadge: { position: 'absolute', top: 12, left: 12, backgroundColor: '#FFFFFF', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
-  newBadgeText: { fontSize: 11, fontWeight: '900', color: '#0A4D44', textTransform: 'uppercase' }, // Yazıyı biraz daha kalın ve büyük harf yaptık
-  
+  newBadgeText: { fontSize: 11, fontWeight: '900', color: '#0A4D44', textTransform: 'uppercase' },
   logoContainer: { position: 'absolute', bottom: -20, left: 20, padding: 3, backgroundColor: '#FFFFFF', borderRadius: 15, elevation: 5 },
   storeLogo: { width: 50, height: 50, borderRadius: 12 },
-  
   cardContent: { padding: 20, paddingTop: 30 },
   cardTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   storeName: { fontSize: 18, fontWeight: '800', color: '#111827', flex: 1 },
   ratingBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFBEB', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   ratingText: { marginLeft: 4, fontSize: 12, fontWeight: '700', color: '#D97706' },
   productDesc: { fontSize: 14, color: '#6B7280', marginTop: 5, marginBottom: 15 },
-  
   footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   infoGroup: { flexDirection: 'row', alignItems: 'center' },
   infoText: { marginLeft: 6, fontSize: 13, color: '#4B5563', fontWeight: '500' },
-
-  stockBadge: { 
-    backgroundColor: '#F0F9F6', 
-    paddingHorizontal: 12, 
-    paddingVertical: 6, 
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#A7D1C6'
-  },
-  stockText: { 
-    color: '#0A4D44', 
-    fontSize: 12, 
-    fontWeight: '800' 
-  }
+  stockBadge: { backgroundColor: '#F0F9F6', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1, borderColor: '#A7D1C6' },
+  stockText: { color: '#0A4D44', fontSize: 12, fontWeight: '800' }
 });

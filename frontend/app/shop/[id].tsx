@@ -39,8 +39,16 @@ export default function ShopDetailScreen() {
     }));
   };
 
+  // GÜNCELLENEN KISIM: Haritaya işletmenin koordinatlarını ve adını yolluyoruz
   const openMap = () => {
-    router.push('/browse');
+    router.push({
+      pathname: '/(tabs)/browse',
+      params: { 
+        lat: '40.8532', // ÖRNEK: Keşan enlemi (İleride backend'den gelen veri ile değişecek)
+        lon: '26.6368', // ÖRNEK: Keşan boylamı (İleride backend'den gelen veri ile değişecek)
+        shopName: name // Tıklanan dükkanın adını haritaya gönderiyoruz
+      }
+    });
   };
 
   const REVIEWS = [

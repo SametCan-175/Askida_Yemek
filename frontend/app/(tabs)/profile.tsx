@@ -12,10 +12,8 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
 export default function ProfileScreen() {
-  // Davet kartının görünürlüğünü kontrol eden state
   const [showInviteCard, setShowInviteCard] = useState(true);
 
-  // 60₺ kupon kazan butonuna basıldığında açılacak paylaşım menüsü
   const handleShare = async () => {
     try {
       await Share.share({
@@ -28,7 +26,6 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Üst Bar */}
       <View style={styles.header}>
         <Ionicons name="happy-outline" size={32} color="#0A4D44" />
         <Text style={styles.headerName}>Berkay</Text>
@@ -39,7 +36,6 @@ export default function ProfileScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         
-        {/* Sipariş Yok Bölümü */}
         <View style={styles.emptyOrderSection}>
           <View style={styles.bagIconBg}>
             <MaterialCommunityIcons name="shopping-outline" size={40} color="#0A4D44" />
@@ -51,7 +47,6 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Profil Menü Seçenekleri */}
         <View style={styles.menuContainer}>
           <TouchableOpacity 
             style={styles.menuItem} 
@@ -81,11 +76,14 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />
           </TouchableOpacity>
 
-          {/* YENİ EKLENEN CANLI DESTEK BUTONU */}
+          {/* GÜNCELLENEN KISIM: Canlı Destek butonu artık user_id gönderiyor */}
           <TouchableOpacity 
             style={styles.menuItem} 
             activeOpacity={0.7}
-            onPress={() => router.push('/support')}
+            onPress={() => router.push({
+              pathname: '/support',
+              params: { user_id: 'berkay_123' } // Arkadaşının istediği ID parametresi
+            })}
           >
             <View style={styles.menuItemLeft}>
               <View style={[styles.menuIconBg, { backgroundColor: '#EEF2FF' }]}>
@@ -97,7 +95,6 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Davet Kartı (showInviteCard true ise gösterilir) */}
         {showInviteCard && (
           <View style={styles.inviteCard}>
             <View style={styles.inviteContent}>
@@ -121,7 +118,6 @@ export default function ProfileScreen() {
                <Text style={styles.promoSub}>
                   Arkadaşların ilk Sürpriz Paketlerini kurtarsın, sen de her seferinde 60₺ kupon kazan — hem de gezegene yardım ederken!
                </Text>
-               {/* Kartı gizleyen buton */}
                <TouchableOpacity style={styles.gotItBtn} onPress={() => setShowInviteCard(false)}>
                   <Text style={styles.gotItBtnText}>Tamam, anladım</Text>
                </TouchableOpacity>
@@ -139,22 +135,17 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
   headerName: { fontSize: 20, fontWeight: '800', color: '#111827', marginLeft: 12, flex: 1 },
   settingsBtn: { padding: 5 },
-  
   scrollContent: { padding: 20, flexGrow: 1 },
-  
   emptyOrderSection: { alignItems: 'center', marginVertical: 20 },
-  
   bagIconBg: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#F0F9F6', justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
   sectionTitle: { fontSize: 18, fontWeight: '800', color: '#111827', marginBottom: 6 },
   sectionDesc: { fontSize: 15, color: '#4B5563', marginBottom: 10 },
   linkText: { fontSize: 16, fontWeight: '700', color: '#0A4D44', textDecorationLine: 'underline' },
-  
   menuContainer: { backgroundColor: '#FFFFFF', borderRadius: 20, borderWidth: 1, borderColor: '#F3F4F6', marginBottom: 30, overflow: 'hidden' },
   menuItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#F9FAFB' },
   menuItemLeft: { flexDirection: 'row', alignItems: 'center' },
   menuIconBg: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F0F9F6', justifyContent: 'center', alignItems: 'center', marginRight: 15 },
   menuText: { fontSize: 16, fontWeight: '700', color: '#374151' },
-
   inviteCard: { backgroundColor: '#0A4D44', borderRadius: 20, overflow: 'hidden', marginTop: 'auto' },
   inviteContent: { flexDirection: 'row', backgroundColor: '#F0F9F6', padding: 20, alignItems: 'center' },
   inviteTextContent: { flex: 1, paddingRight: 10 },

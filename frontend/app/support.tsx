@@ -13,22 +13,25 @@ import {
   Keyboard
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { useLocalSearchParams, router } from 'expo-router';
 
-// Mesaj tipi tanımı
+// GÜNCELLENEN KISIM: Backend'in (Yapay Zekanın) anladığı format
 type Message = {
   id: string;
-  text: string;
-  sender: 'user' | 'ai';
+  content: string; // text yerine content
+  role: 'user' | 'agent'; // sender yerine role
 };
 
 export default function SupportScreen() {
+  // GÜNCELLENEN KISIM: Profile sayfasından gelen user_id'yi yakalıyoruz
+  const { user_id } = useLocalSearchParams();
+
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  // 1. DEĞİŞİKLİK: Karşılama mesajı "Lokmacık" adına göre güncellendi
+  // GÜNCELLENEN KISIM: Başlangıç mesajının formatı uyarlandı
   const [messages, setMessages] = useState<Message[]>([
-    { id: '1', text: 'Merhaba! Ben Lokmacık, senin akıllı asistanın. Siparişlerin veya uygulamayla ilgili sana nasıl yardımcı olabilirim? 😊', sender: 'ai' }
+    { id: '1', content: 'Merhaba! Ben Lokmacık, senin akıllı asistanın. Siparişlerin veya uygulamayla ilgili sana nasıl yardımcı olabilirim? 😊', role: 'agent' }
   ]);
 
   const flatListRef = useRef<FlatList>(null);
@@ -36,43 +39,46 @@ export default function SupportScreen() {
   const handleSend = async () => {
     if (!inputText.trim()) return;
 
-    // Kullanıcının mesajını ekrana ekle
-    const userMessage: Message = { id: Date.now().toString(), text: inputText, sender: 'user' };
-    setMessages(prev => [...prev, userMessage]);
-    const currentText = inputText;
+    // Kullanıcının yazdığını objeye çevir
+    const userMessage: Message = { id: Date.now().toString(), content: inputText.trim(), role: 'user' };
+    
+    // GÜNCELLENEN KISIM: Mevcut mesajların üstüne yeni mesajı ekle (Geçmiş - History)
+    const updatedHistory = [...messages, userMessage];
+    
+    setMessages(updatedHistory);
     setInputText('');
     setIsLoading(true);
     Keyboard.dismiss();
 
     try {
-      // BACKEND API İSTEĞİ (POST /ai/destek)
-      // "https://api.senin-siten.com/ai/destek" kısmını backend'cinin verdiği gerçek URL ile değiştir
       const response = await fetch('https://api.seninsiten.com/ai/destek', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: currentText }), 
+        // GÜNCELLENEN KISIM: Arkadaşının tam olarak istediği 2 parametre (user_id ve history)
+        body: JSON.stringify({ 
+          user_id: user_id, 
+          history: updatedHistory 
+        }), 
       });
 
-      // Backend'in { reply: "cevap metni..." } döndüğünü varsayıyoruz
       const data = await response.json();
 
       // AI'dan gelen cevabı ekrana ekle
       const aiMessage: Message = { 
         id: (Date.now() + 1).toString(), 
-        text: data.reply || data.message || "Mesajın alındı, ancak API yanıt formatı eşleşmedi.", 
-        sender: 'ai' 
+        content: data.reply || data.message || "Mesajın alındı, ancak API yanıt formatı eşleşmedi.", 
+        role: 'agent' 
       };
       setMessages(prev => [...prev, aiMessage]);
 
     } catch (error) {
       console.error("Chat API Hatası:", error);
-      // Backend kapalıysa veya internet yoksa hata mesajı göster
       const errorMessage: Message = { 
         id: (Date.now() + 1).toString(), 
-        text: "Şu anda sunucularımıza ulaşamıyoruz. Backend tarafı aktif olmayabilir.", 
-        sender: 'ai' 
+        content: "Şu anda sunucularımıza ulaşamıyoruz. Backend tarafı aktif olmayabilir.", 
+        role: 'agent' 
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
@@ -80,20 +86,18 @@ export default function SupportScreen() {
     }
   };
 
-  // Mesaj balonu tasarımı
   const renderMessage = ({ item }: { item: Message }) => {
-    const isUser = item.sender === 'user';
+    const isUser = item.role === 'user'; // sender yerine role kontrolü
     return (
       <View style={[styles.messageWrapper, isUser ? styles.messageWrapperUser : styles.messageWrapperAI]}>
         {!isUser && (
-          // 2. DEĞİŞİKLİK: AI Avatarı güncellendi (Parıltı yerine şirin yemek yüzü)
           <View style={styles.aiAvatar}>
             <MaterialCommunityIcons name="emoticon-happy-outline" size={20} color="#FFFFFF" />
           </View>
         )}
         <View style={[styles.messageBubble, isUser ? styles.userBubble : styles.aiBubble]}>
           <Text style={[styles.messageText, isUser ? styles.userText : styles.aiText]}>
-            {item.text}
+            {item.content} {/* text yerine content */}
           </Text>
         </View>
       </View>
@@ -106,20 +110,17 @@ export default function SupportScreen() {
         style={{ flex: 1 }} 
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* Üst Bar */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={26} color="#111827" />
           </TouchableOpacity>
           <View style={styles.headerTitleContainer}>
             <Text style={styles.headerTitle}>Canlı Destek</Text>
-            {/* 3. DEĞİŞİKLİK: Alt başlık "Lokmacık" olarak değiştirildi */}
             <Text style={styles.headerSubtitle}>Lokmacık</Text>
           </View>
           <View style={{ width: 36 }} />
         </View>
 
-        {/* Sohbet Ekranı */}
         <FlatList
           ref={flatListRef}
           data={messages}
@@ -131,7 +132,6 @@ export default function SupportScreen() {
           showsVerticalScrollIndicator={false}
         />
 
-        {/* AI Yazıyor Animasyonu */}
         {isLoading && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="small" color="#0A4D44" />
@@ -139,7 +139,6 @@ export default function SupportScreen() {
           </View>
         )}
 
-        {/* Mesaj Yazma Alanı */}
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.textInput}
@@ -170,7 +169,6 @@ const styles = StyleSheet.create({
   backBtn: { padding: 5, marginLeft: -5 },
   headerTitleContainer: { alignItems: 'center' },
   headerTitle: { fontSize: 18, fontWeight: '800', color: '#111827' },
-  // 4. DEĞİŞİKLİK: Alt başlık rengi marka yeşili yapıldı ve kalınlaştırıldı
   headerSubtitle: { fontSize: 13, color: '#0A4D44', fontWeight: '800', marginTop: 2 },
   
   chatList: { padding: 20, paddingBottom: 10 },
@@ -179,7 +177,6 @@ const styles = StyleSheet.create({
   messageWrapperUser: { justifyContent: 'flex-end' },
   messageWrapperAI: { justifyContent: 'flex-start' },
   
-  // AI Avatarı (Yeşil yuvarlak aynı kaldı, içindeki ikon değişti)
   aiAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#0A4D44', justifyContent: 'center', alignItems: 'center', marginRight: 8, marginBottom: 5 },
   
   messageBubble: { maxWidth: '80%', padding: 15, borderRadius: 20 },
