@@ -97,3 +97,30 @@ class Listing(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     shop = relationship("Shop", back_populates="listings")
+
+
+class ListingAiScore(Base):
+    #AI tarafından hesaplanan ilan skorlarını ve özel etiketleri tutar.
+    __tablename__ = "listing_ai_scores"
+
+    id = Column(Integer, primary_key=True, index=True)
+    listing_id = Column(Integer, ForeignKey("listings.id"), unique=True, nullable=False)
+    ai_score = Column(Float, nullable=False)
+    badge_text = Column(String, nullable=True)
+    ai_description = Column(Text, nullable=True)
+
+    listing = relationship("Listing", backref="ai_score")
+
+
+class UserBadge(Base):
+    #Kullanıcıların kazandığı başarı rozetlerini tutar.
+    __tablename__ = "user_badges"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String, nullable=False)
+    emoji = Column(String, nullable=True)
+    description = Column(Text, nullable=True)
+    earned_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", backref="badges")
