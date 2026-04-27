@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 
@@ -27,6 +27,12 @@ class SiparisTamamlandi(BaseModel):
     listing_id: int
 
 
+class DestekMesaj(BaseModel):
+    user_id: int
+    mesaj: str
+    konusma_gecmisi: List[Dict[str, Any]] = []
+
+
 # ─── Endpoint'ler ─────────────────────────────────────────────────────────────
 
 @router.post("/listings/ai-scores", status_code=200)
@@ -37,20 +43,12 @@ def save_ai_scores(
     """
     AI'ın hesapladığı skorları, badge metinlerini ve açıklamaları kaydeder.
     Frontend GET /listings veya GET /listings/{id} ile bunları okur.
-
-    AI ekibi toplu gönderir:
-    {
-      "scores": [
-        {"listing_id": 1, "ai_score": 0.95, "badge_text": "Günün Yıldızı", "ai_description": "..."},
-        {"listing_id": 2, "ai_score": 0.78, "badge_text": "Sana Özel", "ai_description": "..."}
-      ]
-    }
     """
     guncellenen = []
     for item in payload.scores:
         listing = db.query(Listing).filter(Listing.id == item.listing_id).first()
         if not listing:
-            continue  # Olmayan ilan varsa atla, hata döndürme
+            continue
 
         existing = db.query(ListingAiScore).filter(
             ListingAiScore.listing_id == item.listing_id
@@ -87,7 +85,6 @@ def siparis_tamamlandi(
     if not listing:
         raise HTTPException(status_code=404, detail="İlan bulunamadı.")
 
-    # Kullanıcının tüm tamamlanmış rezervasyonları
     tum_siparisler = (
         db.query(Reservation)
         .filter(
@@ -97,14 +94,12 @@ def siparis_tamamlandi(
         .all()
     )
 
-    # Tasarruf hesabı
     toplam_tasarruf = sum(
         (r.listing.original_price - r.listing.discounted_price) * r.quantity
         for r in tum_siparisler
         if r.listing
     )
 
-    # En çok sipariş verilen kategori
     kategori_sayac: dict = {}
     for r in tum_siparisler:
         if r.listing and r.listing.shop:
@@ -121,11 +116,6 @@ def siparis_tamamlandi(
         "kategori_dagilimi": kategori_sayac,
     }
 
-class DestekMesaj(BaseModel):
-    user_id: int
-    mesaj: str
-    konusma_gecmisi: List[Dict[str, Any]] = []
-
 
 @router.post("/ai/destek")
 def canli_destek(
@@ -133,46 +123,50 @@ def canli_destek(
     db: Session = Depends(get_db),
 ):
     """
-    Canlı destek endpoint'i. AI modülü bu endpoint'ten kullanıcı mesajını alır,
-    konuşma geçmişiyle birlikte işler ve yanıt üretir.
+    Canlı destek endpoint'i. Lokma (AI) bu endpoint'ten veriyi alır.
 
-    Örnek istek:
+    Backend otomatik olarak kullanıcının sipariş geçmişini çekip
+    siparis_gecmisi alanında döner. Lokma bu veriyi görerek
+    "Son siparişin X kafeden Y ürünüydü" gibi gerçek yanıtlar verebilir.
+
+    Dönen format:
     {
         "user_id": 1,
-        "mesaj": "Siparişim nerede?",
-        "konusma_gecmisi": [
-            {"rol": "kullanici", "icerik": "Merhaba"},
-            {"rol": "asistan", "icerik": "Merhaba! Size nasıl yardımcı olabilirim?"}
+        "kullanici_adi": "Ali",
+        "mesaj": "Son siparişim ne?",
+        "konusma_gecmisi": [...],
+        "siparis_gecmisi": [
+            {"urun": "Ekmek Sepeti", "kafe": "Ayşe'nin Fırını",
+             "tarih": "2026-04-27", "fiyat": 25, "durum": "picked_up"}
         ]
     }
-
-    Backend şunları ekler:
-    - Kullanıcının son rezervasyonları (AI bağlam için kullanır)
-    - Kullanıcı adı
     """
     user = db.query(User).filter(User.id == payload.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
 
-    # Kullanıcının son 5 rezervasyonunu bağlam olarak ekle
-    from models import Reservation
-    son_rezervasyonlar = (
+    # Kullanıcının son 10 siparişini çek
+    son_siparisler = (
         db.query(Reservation)
+        .options(
+            joinedload(Reservation.listing).joinedload(Listing.shop)
+        )
         .filter(Reservation.user_id == payload.user_id)
         .order_by(Reservation.created_at.desc())
-        .limit(5)
+        .limit(10)
         .all()
     )
 
-    baglam = [
+    siparis_gecmisi = [
         {
-            "rezervasyon_id": r.id,
+            "urun": r.listing.title if r.listing else None,
+            "kafe": r.listing.shop.name if r.listing and r.listing.shop else None,
+            "tarih": r.created_at.strftime("%Y-%m-%d"),
+            "fiyat": r.listing.discounted_price if r.listing else None,
             "durum": r.status,
-            "listing_id": r.listing_id,
             "adet": r.quantity,
-            "tarih": r.created_at.isoformat(),
         }
-        for r in son_rezervasyonlar
+        for r in son_siparisler
     ]
 
     return {
@@ -180,7 +174,5 @@ def canli_destek(
         "kullanici_adi": user.full_name,
         "mesaj": payload.mesaj,
         "konusma_gecmisi": payload.konusma_gecmisi,
-        "baglam": {
-            "son_rezervasyonlar": baglam,
-        },
+        "siparis_gecmisi": siparis_gecmisi,
     }
