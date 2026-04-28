@@ -4,7 +4,7 @@ from database import Base, engine
 from routers import auth, shops, listings, ai_listings, reservations, analytics
 from routers import ai_integration, users
 from scheduler import start_scheduler
-from routers import ai_integration, users, reservations, analytics
+from routers import ai_integration, users, reservations, analytics,notifications
 
 Base.metadata.create_all(bind=engine)
 
@@ -34,6 +34,7 @@ app.include_router(reservations.router,   prefix="/reservations", tags=["Reserva
 app.include_router(users.router,          prefix="/users",        tags=["Users"])
 app.include_router(ai_integration.router, prefix="",              tags=["AI Integration"])
 app.include_router(analytics.router,      prefix="/analytics",    tags=["Analytics"]) 
+app.include_router(notifications.router, prefix="/notifications", tags=["Notifications"])
 
 @app.on_event("startup")
 def startup():
