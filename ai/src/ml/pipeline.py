@@ -157,11 +157,11 @@ def ai_pipeline_calistir(kullanici: dict) -> list:
 # ── Test çalıştırma ───────────────────────────────────────────────────────────
 if __name__ == "__main__":
     test_kullanici = {
-        "id": 1,
-        "lat": 41.008,
-        "lon": 29.012,
-        "tercihler": ["vegan", "kahve"]
-    }
+    "id": 1,
+    "lat": 40.9612,
+    "lon": 29.07,
+    "tercihler": ["vegan", "kahve"]
+}
 
     sonuclar = ai_pipeline_calistir(test_kullanici)
 
