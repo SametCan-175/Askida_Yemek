@@ -1,10 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import Base, engine
-from routers import auth, shops, listings, ai_listings, reservations, analytics
-from routers import ai_integration, users
+from routers import auth, shops, listings, ai_listings, reservations, analytics , ai_integration, users, notifications
 from scheduler import start_scheduler
-from routers import ai_integration, users, reservations, analytics
+
 
 Base.metadata.create_all(bind=engine)
 
@@ -30,6 +29,7 @@ app.include_router(ai_listings.router,   prefix="/listings",tags=["AI"])
 app.include_router(listings.router,      prefix="/listings",tags=["Listings"])
 app.include_router(ai_integration.router, prefix="",tags=["AI Integration"])
 app.include_router(analytics.router,     prefix="/analytics",tags=["Analytics"])
+app.include_router(notifications.router, prefix="/notifications",  tags=["Notifications"])
 app.include_router(reservations.router,   prefix="/reservations", tags=["Reservations"])
 app.include_router(users.router,          prefix="/users",        tags=["Users"])
 app.include_router(ai_integration.router, prefix="",              tags=["AI Integration"])
