@@ -124,3 +124,20 @@ class UserBadge(Base):
     earned_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", backref="badges")
+
+
+class Notification(Base):
+    """AI tarafından tetiklenen kullanıcı bildirimleri."""
+    __tablename__ = "notifications"
+ 
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    listing_id = Column(Integer, ForeignKey("listings.id"), nullable=True)
+    title = Column(String, nullable=False)
+    body = Column(String, nullable=False)
+    ai_score = Column(String, nullable=True)
+    badge_text = Column(String, nullable=True)
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+ 
+    user = relationship("User", backref="notifications")
