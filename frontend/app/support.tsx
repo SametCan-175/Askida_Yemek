@@ -10,7 +10,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Keyboard
+  Keyboard,
+  Image
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -56,7 +57,7 @@ export default function SupportScreen() {
         headers: {
           'Content-Type': 'application/json',
         },
-        // GÜNCELLENEN KISIM: Arkadaşının tam olarak istediği 2 parametre (user_id ve history)
+        
         body: JSON.stringify({ 
           user_id: user_id, 
           history: updatedHistory 
@@ -92,7 +93,10 @@ export default function SupportScreen() {
       <View style={[styles.messageWrapper, isUser ? styles.messageWrapperUser : styles.messageWrapperAI]}>
         {!isUser && (
           <View style={styles.aiAvatar}>
-            <MaterialCommunityIcons name="emoticon-happy-outline" size={20} color="#FFFFFF" />
+            <Image 
+              source={require('../assets/lokmacik.png')}
+              style={styles.lokmacikImage}
+            />
           </View>
         )}
         <View style={[styles.messageBubble, isUser ? styles.userBubble : styles.aiBubble]}>
@@ -177,7 +181,12 @@ const styles = StyleSheet.create({
   messageWrapperUser: { justifyContent: 'flex-end' },
   messageWrapperAI: { justifyContent: 'flex-start' },
   
-  aiAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#0A4D44', justifyContent: 'center', alignItems: 'center', marginRight: 8, marginBottom: 5 },
+  aiAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#0A4D44', justifyContent: 'center', alignItems: 'center', marginRight: 8, marginBottom: 5, overflow: 'hidden' },
+  lokmacikImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover' // Resmi yuvarlağın içine tam oturtur
+  },
   
   messageBubble: { maxWidth: '80%', padding: 15, borderRadius: 20 },
   userBubble: { backgroundColor: '#0A4D44', borderBottomRightRadius: 5 },

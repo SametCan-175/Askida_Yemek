@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -6,26 +6,33 @@ import {
   SafeAreaView, 
   ScrollView, 
   TouchableOpacity, 
-  Dimensions
+  Dimensions,
+  ActivityIndicator,
+  Alert
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
-// Görseldeki gibi İlerleme Çubuklu Ödül Kartı
-const AchievementCard = ({ title, desc, icon, current, total, color, unlocked = false }: any) => {
+// 1. KART BİLEŞENİ GÜNCELLENDİ: Artık API'den gelen 'emoji' parametresini de destekliyor
+const AchievementCard = ({ title, desc, icon, emoji, current, total, color, unlocked = false }: any) => {
   const progress = (current / total) * 100;
   
   return (
     <View style={styles.card}>
       <View style={styles.cardTop}>
         <View style={[styles.iconBox, { backgroundColor: unlocked ? color + '15' : '#F3F4F6' }]}>
-          <MaterialCommunityIcons 
-            name={icon} 
-            size={28} 
-            color={unlocked ? color : '#9CA3AF'} 
-          />
+          {/* Eğer backend'den emoji gelirse onu bas, gelmezse eski ikon sistemini kullan */}
+          {emoji ? (
+            <Text style={{ fontSize: 26 }}>{emoji}</Text>
+          ) : (
+            <MaterialCommunityIcons 
+              name={icon} 
+              size={28} 
+              color={unlocked ? color : '#9CA3AF'} 
+            />
+          )}
         </View>
         <View style={styles.cardTextContent}>
           <Text style={styles.cardTitle}>{title}</Text>
@@ -52,6 +59,41 @@ const AchievementCard = ({ title, desc, icon, current, total, color, unlocked = 
 };
 
 export default function SpecialRewards() {
+  // 2. STATE'LER EKLENDİ
+  const [earnedBadges, setEarnedBadges] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // 3. SAYFA AÇILDIĞINDA API'YE İSTEK ATACAK useEffect
+  useEffect(() => {
+    fetchBadges();
+  }, []);
+
+  const fetchBadges = async () => {
+    try {
+      // Backend'in verdiği endpoint
+      const response = await fetch('https://api.seninsiten.com/users/rozetler', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          // auth: true olduğu için kullanıcının token'ını buraya ekliyoruz
+          'Authorization': `Bearer BURAYA_KULLANICI_TOKENI_GELECEK` 
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setEarnedBadges(data); // API'den gelen diziyi state'e kaydet
+      } else {
+        console.log('Rozetler çekilemedi, durum kodu:', response.status);
+      }
+    } catch (error) {
+      console.error("Rozet API Hatası:", error);
+      Alert.alert("Bağlantı Hatası", "Rozetleriniz şu an yüklenemiyor.");
+    } finally {
+      setIsLoading(false); // Yükleme bitti
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -67,27 +109,49 @@ export default function SpecialRewards() {
         {/* Üst Özet Kartı */}
         <View style={styles.summaryBox}>
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryNumber}>12</Text>
-            <Text style={styles.summaryLabel}>Tamamlanan</Text>
+            {/* Dinamik sayı: Kazanılan rozet sayısı */}
+            <Text style={styles.summaryNumber}>{earnedBadges.length}</Text>
+            <Text style={styles.summaryLabel}>Kazanılan</Text>
           </View>
           <View style={styles.summaryDivider} />
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryNumber}>4</Text>
+            {/* Şimdilik statik bir hedef belirledik (Örn: Toplam 10 rozet var) */}
+            <Text style={styles.summaryNumber}>{Math.max(10 - earnedBadges.length, 0)}</Text>
             <Text style={styles.summaryLabel}>Bekleyen</Text>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>AKTİF BAŞARIMLAR</Text>
+        <Text style={styles.sectionTitle}>KAZANILAN ROZETLER</Text>
 
-        <AchievementCard 
-          title="Doğa Dostu I" 
-          desc="5 adet sürpriz paket kurtararak karbon ayak izini azalt."
-          icon="leaf"
-          current={5}
-          total={5}
-          color="#10B981"
-          unlocked={true}
-        />
+        {/* 4. YÜKLEME DURUMU VE VERİLERİN EKRANA BASILMASI */}
+        {isLoading ? (
+          <View style={{ padding: 40, alignItems: 'center' }}>
+            <ActivityIndicator size="large" color="#0A4D44" />
+            <Text style={{ marginTop: 10, color: '#6B7280' }}>Rozetlerin yükleniyor...</Text>
+          </View>
+        ) : earnedBadges.length > 0 ? (
+          // Backend'den gelen veriyi (map ile) kartlara dönüştürüyoruz
+          earnedBadges.map((badge) => (
+            <AchievementCard 
+              key={badge.id}
+              title={badge.name} 
+              desc={badge.description}
+              emoji={badge.emoji}
+              current={10} // Backend ilerleme verisi yollamadığı için kazanılmışlarda full gösteriyoruz
+              total={10}
+              color="#10B981"
+              unlocked={true}
+            />
+          ))
+        ) : (
+          <View style={{ padding: 20, alignItems: 'center', backgroundColor: '#FFF', borderRadius: 16 }}>
+            <Text style={{ color: '#6B7280' }}>Henüz kazanılmış bir rozetin yok. Sipariş vererek rozet kazanmaya başla!</Text>
+          </View>
+        )}
+
+        {/* İleride backend "kilitli rozetleri" de dönerse buraya ekleyebiliriz. 
+            Şimdilik eski statik kilitli rozetleri örnek olarak aşağıda tutuyorum */}
+        <Text style={[styles.sectionTitle, { marginTop: 20 }]}>KİLİTLİ BAŞARIMLAR</Text>
 
         <AchievementCard 
           title="Tasarruf Ustası" 
@@ -106,16 +170,6 @@ export default function SpecialRewards() {
           current={3}
           total={10}
           color="#F59E0B"
-          unlocked={false}
-        />
-
-        <AchievementCard 
-          title="Sadık Müşteri" 
-          desc="Aynı işletmeden 5 kez paket al."
-          icon="heart"
-          current={4}
-          total={5}
-          color="#EC4899"
           unlocked={false}
         />
         
@@ -186,5 +240,5 @@ const styles = StyleSheet.create({
   progressBarBg: { height: 8, backgroundColor: '#F3F4F6', borderRadius: 4, overflow: 'hidden' },
   progressBarFill: { height: '100%', borderRadius: 4 },
 
-  footerSpacing: { height: 20 }
+  footerSpacing: { height: 40 }
 });
