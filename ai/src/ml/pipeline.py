@@ -8,6 +8,7 @@ Akış:
   4. Kullanıcıya özel filtrele (recommender)
   5. Groq ile badge_text + ai_description üret (groq_service)
   6. Sonuçları Batuhan'a geri gönder (api_client → post_ai_scores)
+  7. Bildirim gönder (notification → ai_oneri + stok_uyari)
 """
 
 import logging
@@ -20,6 +21,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.api_client import AIListingService
 from services.groq_service import groq_cagir
+from services.notification import bildir_ai_oneri, bildir_stok_azaliyor
 from ml.text_processor import urunleri_isle
 from ml.ranker import feed_ranker
 from ml.recommender import get_personalized_recommendations
@@ -77,7 +79,8 @@ def ai_pipeline_calistir(kullanici: dict) -> list:
         "id": 1,
         "lat": 41.008,
         "lon": 29.012,
-        "tercihler": ["vegan", "kahve"]   # boş liste olabilir
+        "tercihler": ["vegan", "kahve"],   # boş liste olabilir
+        "ad": "Ali"                        # bildirim için (opsiyonel)
     }
 
     Döndürür: Batuhan'a POST edilecek liste
@@ -93,6 +96,8 @@ def ai_pipeline_calistir(kullanici: dict) -> list:
     logger.info(f"🚀 Pipeline başladı — kullanıcı: {kullanici.get('id')}")
 
     service = AIListingService()
+    kullanici_id = kullanici.get("id")
+    kullanici_adi = kullanici.get("ad", "Kullanıcı")
 
     # ── ADIM 1: Listing'leri çek ──────────────────────────────────────────────
     ham_listeler = service.fetch_targeted_listings(
@@ -107,19 +112,25 @@ def ai_pipeline_calistir(kullanici: dict) -> list:
     logger.info(f"📦 {len(ham_listeler)} listing çekildi.")
 
     # ── ADIM 2: Metinleri işle (TF-IDF + kategori tespiti) ───────────────────
-    # urunleri_isle → "urun", "kafe", "aciklama" alanlarını kullanıyor
-    # Batuhan'ın API'si bu alanları zaten bu isimlerle döndürüyor ✅
     islenmis = urunleri_isle(ham_listeler)
     logger.info("📝 Metinler işlendi.")
 
     # ── ADIM 3: Skorla ve sırala ──────────────────────────────────────────────
-    # ranker → "indirim_orani", "mesafe_km", "adet" kullanıyor
-    # Batuhan'ın API'si mesafe_km'yi zaten hesaplayıp döndürüyor ✅
     skorlananlar = feed_ranker(islenmis)
     logger.info("📊 Skorlama tamamlandı.")
 
+    # ── ADIM 3.5: Stok azalan ürünler için bildirim ───────────────────────────
+    for firsat in skorlananlar:
+        kalan = firsat.get("adet", 99)
+        if kalan <= 2:
+            bildir_stok_azaliyor(
+                user_id=kullanici_id,
+                firsat=firsat,
+                kalan_adet=kalan
+            )
+            logger.info(f"⚡ Stok uyarısı gönderildi → {firsat.get('urun')} ({kalan} adet)")
+
     # ── ADIM 4: Kullanıcıya özel filtrele ────────────────────────────────────
-    # recommender → "kategori", "urun" ve kullanici["tercihler"] kullanıyor ✅
     onerilenler = get_personalized_recommendations(kullanici, skorlananlar)
 
     # Eğer tercih eşleşmesi yoksa tüm listeyi kullan
@@ -129,17 +140,31 @@ def ai_pipeline_calistir(kullanici: dict) -> list:
     logger.info(f"🎯 {len(onerilenler)} kişiselleştirilmiş öneri hazır.")
 
     # ── ADIM 5: Groq ile badge + açıklama üret ───────────────────────────────
-    # Token tasarrufu için sadece ilk 10 ürün için Groq çağrısı yapılıyor
     sonuclar = []
     for firsat in onerilenler[:10]:
         groq_cikti = groq_badge_ve_aciklama_uret(firsat, kullanici)
 
-        sonuclar.append({
-            "listing_id": firsat.get("id"),
+        firsat_sonuc = {
+            "listing_id": firsat.get("listing_id") or firsat.get("id"),
             "ai_score": firsat.get("ai_score", 0),
             "badge_text": groq_cikti.get("badge_text", "Fırsat"),
             "ai_description": groq_cikti.get("ai_description", ""),
-        })
+        }
+        sonuclar.append(firsat_sonuc)
+
+        # ── ADIM 5.5: En iyi öneri için kişisel bildirim gönder ──────────────
+        # Sadece ilk (en iyi skorlu) ürün için bildirim gönderiyoruz
+        if len(sonuclar) == 1:
+            bildir_ai_oneri(
+                user_id=kullanici_id,
+                kullanici_adi=kullanici_adi,
+                firsat={
+                    **firsat,
+                    "listing_id": firsat.get("id"),
+                    "ai_description": groq_cikti.get("ai_description", "")
+                }
+            )
+            logger.info(f"🔔 AI öneri bildirimi gönderildi → user:{kullanici_id}")
 
     logger.info(f"✨ {len(sonuclar)} ürün için Groq metni üretildi.")
 
@@ -157,11 +182,12 @@ def ai_pipeline_calistir(kullanici: dict) -> list:
 # ── Test çalıştırma ───────────────────────────────────────────────────────────
 if __name__ == "__main__":
     test_kullanici = {
-    "id": 1,
-    "lat": 40.9612,
-    "lon": 29.07,
-    "tercihler": ["vegan", "kahve"]
-}
+        "id": 1,
+        "ad": "Samet",
+        "lat": 40.9612,
+        "lon": 29.07,
+        "tercihler": ["vegan", "kahve"]
+    }
 
     sonuclar = ai_pipeline_calistir(test_kullanici)
 

@@ -7,3 +7,4 @@ passlib[bcrypt]==1.7.4
 python-multipart==0.0.12
 # Prod için PostgreSQL sürücüsü:
 # psycopg2-binary==2.9.9
+apscheduler==3.10.4

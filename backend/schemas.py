@@ -1,11 +1,44 @@
 from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional, List
 from datetime import datetime
-from models import UserRole, ListingStatus
+from models import UserRole, ListingStatus, ReservationStatus
 
 
 # ─────────────────────────────────────────
-# giriş
+# RESERVATION SCHEMAS
+# ─────────────────────────────────────────
+
+class ReservationCreate(BaseModel):
+    listing_id: int
+    quantity: int = 1
+    note: Optional[str] = None
+
+    @field_validator("quantity")
+    @classmethod
+    def quantity_positive(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError("Adet en az 1 olmalıdır.")
+        return v
+
+
+class ReservationOut(BaseModel):
+    id: int
+    user_id: int
+    listing_id: int
+    quantity: int
+    status: ReservationStatus
+    note: Optional[str]
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ReservationStatusUpdate(BaseModel):
+    status: ReservationStatus
+
+
+# ─────────────────────────────────────────
+# AUTH SCHEMAS
 # ─────────────────────────────────────────
 
 class UserRegister(BaseModel):
@@ -45,7 +78,7 @@ class Token(BaseModel):
 
 
 # ─────────────────────────────────────────
-# market
+# SHOP SCHEMAS
 # ─────────────────────────────────────────
 
 class ShopCreate(BaseModel):
@@ -84,7 +117,7 @@ class ShopList(BaseModel):
 
 
 # ─────────────────────────────────────────
-# listeleme şemalar
+# LISTING SCHEMAS
 # ─────────────────────────────────────────
 
 class ListingCreate(BaseModel):

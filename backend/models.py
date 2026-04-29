@@ -5,7 +5,8 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
-from database import Base #- db dbyi kurunca değişebilir
+
+from database import Base
 
 
 class UserRole(str, enum.Enum):
@@ -50,6 +51,29 @@ class Shop(Base):
     listings = relationship("Listing", back_populates="shop")
 
 
+class ReservationStatus(str, enum.Enum):
+    pending = "pending"       # Rezervasyon yapıldı
+    confirmed = "confirmed"   # İşletme onayladı
+    picked_up = "picked_up"   # Kullanıcı teslim aldı
+    cancelled = "cancelled"   # İptal edildi
+
+
+class Reservation(Base):
+    __tablename__ = "reservations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    listing_id = Column(Integer, ForeignKey("listings.id"), nullable=False)
+    quantity = Column(Integer, nullable=False, default=1)
+    status = Column(Enum(ReservationStatus), default=ReservationStatus.pending)
+    note = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    user = relationship("User", backref="reservations")
+    listing = relationship("Listing", backref="reservations")
+
+
 class ListingStatus(str, enum.Enum):
     active = "active"
     sold_out = "sold_out"
@@ -73,3 +97,30 @@ class Listing(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     shop = relationship("Shop", back_populates="listings")
+
+
+class ListingAiScore(Base):
+    #AI tarafından hesaplanan ilan skorlarını ve özel etiketleri tutar.
+    __tablename__ = "listing_ai_scores"
+
+    id = Column(Integer, primary_key=True, index=True)
+    listing_id = Column(Integer, ForeignKey("listings.id"), unique=True, nullable=False)
+    ai_score = Column(Float, nullable=False)
+    badge_text = Column(String, nullable=True)
+    ai_description = Column(Text, nullable=True)
+
+    listing = relationship("Listing", backref="ai_score")
+
+
+class UserBadge(Base):
+    #Kullanıcıların kazandığı başarı rozetlerini tutar.
+    __tablename__ = "user_badges"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String, nullable=False)
+    emoji = Column(String, nullable=True)
+    description = Column(Text, nullable=True)
+    earned_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", backref="badges")
