@@ -1,5 +1,4 @@
 ﻿# Askida Yemek
-
 Agentic AI Destekli Gida Israfi Onleme Uygulamasi
 
 ## Ekip (7 Kisi)
