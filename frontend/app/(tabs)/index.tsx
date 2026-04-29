@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { 
   View, 
   Text, 
@@ -9,16 +9,18 @@ import {
   Image,
   Dimensions,
   Platform,
-  LogBox // 1. EKLENDİ: Uyarıları gizlemek için
+  LogBox 
 } from 'react-native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 
+// GÜNCELLENEN KISIM 1: Hafızayı çağırıyoruz
+import { FavoritesContext } from './_layout'; 
+
 const { width } = Dimensions.get('window');
 
-// 2. EKLENDİ: Alttan çıkan o minik Expo Go push bildirim uyarısını tamamen gizler!
 LogBox.ignoreLogs(['expo-notifications: Android Push notifications']);
 
 Notifications.setNotificationHandler({
@@ -30,7 +32,8 @@ Notifications.setNotificationHandler({
   }),
 });
 
-const SURPRISE_BAGS = [
+// GÜNCELLENEN KISIM 2: 'export' ekledik ki favoriler sayfası da dükkan verilerini görebilsin
+export const SURPRISE_BAGS = [
   {
     id: '1',
     name: 'Keşan Merkez Fırını',
@@ -57,6 +60,9 @@ const SURPRISE_BAGS = [
 
 export default function Index() {
   const [expoPushToken, setExpoPushToken] = useState('');
+  
+  // GÜNCELLENEN KISIM 3: Context'ten favori listesini ve fonksiyonunu alıyoruz
+  const { favorites, toggleFavorite } = useContext(FavoritesContext);
 
   useEffect(() => {
     async function initNotifications() {
@@ -86,54 +92,72 @@ export default function Index() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {SURPRISE_BAGS.map((item) => (
-          <TouchableOpacity 
-            key={item.id} 
-            style={styles.card}
-            activeOpacity={0.9}
-            onPress={() => router.push({
-              pathname: `/shop/${item.id}`,
-              params: { name: item.name, image: item.image, logo: item.logo, distance: item.distance }
-            })}
-          >
-            <View style={styles.imageContainer}>
-              <Image source={{ uri: item.image }} style={styles.cardImage} />
-              
-              {item.badge_text ? (
-                <View style={styles.newBadge}>
-                  <Text style={styles.newBadgeText}>{item.badge_text}</Text>
-                </View>
-              ) : null}
+        {SURPRISE_BAGS.map((item) => {
+          // Bu dükkan favoriler listesinde var mı diye kontrol ediyoruz
+          const isFavorite = favorites?.includes(item.id);
 
-              <View style={styles.logoContainer}>
-                <Image source={{ uri: item.logo }} style={styles.storeLogo} />
-              </View>
-            </View>
+          return (
+            <TouchableOpacity 
+              key={item.id} 
+              style={styles.card}
+              activeOpacity={0.9}
+              onPress={() => router.push({
+                pathname: `/shop/${item.id}`,
+                params: { name: item.name, image: item.image, logo: item.logo, distance: item.distance }
+              })}
+            >
+              <View style={styles.imageContainer}>
+                <Image source={{ uri: item.image }} style={styles.cardImage} />
+                
+                {item.badge_text ? (
+                  <View style={styles.newBadge}>
+                    <Text style={styles.newBadgeText}>{item.badge_text}</Text>
+                  </View>
+                ) : null}
 
-            <View style={styles.cardContent}>
-              <View style={styles.cardTopRow}>
-                <Text style={styles.storeName}>{item.name}</Text>
-                <View style={styles.ratingBox}>
-                  <Ionicons name="star" size={12} color="#D97706" />
-                  <Text style={styles.ratingText}>4.8</Text>
-                </View>
-              </View>
-              
-              <Text style={styles.productDesc}>{item.description}</Text>
-              
-              <View style={styles.footerRow}>
-                <View style={styles.infoGroup}>
-                  <MaterialCommunityIcons name="clock-outline" size={16} color="#6B7280" />
-                  <Text style={styles.infoText}>{item.time}</Text>
-                </View>
+                {/* GÜNCELLENEN KISIM 4: Kalp Butonu */}
+                <TouchableOpacity 
+                  style={styles.favoriteBtn}
+                  activeOpacity={0.7}
+                  onPress={() => toggleFavorite(item.id)}
+                >
+                  <Ionicons 
+                    name={isFavorite ? "heart" : "heart-outline"} 
+                    size={22} 
+                    color={isFavorite ? "#EF4444" : "#111827"} 
+                  />
+                </TouchableOpacity>
 
-                <View style={styles.stockBadge}>
-                  <Text style={styles.stockText}>{item.stock} Ürün Kaldı</Text>
+                <View style={styles.logoContainer}>
+                  <Image source={{ uri: item.logo }} style={styles.storeLogo} />
                 </View>
               </View>
-            </View>
-          </TouchableOpacity>
-        ))}
+
+              <View style={styles.cardContent}>
+                <View style={styles.cardTopRow}>
+                  <Text style={styles.storeName}>{item.name}</Text>
+                  <View style={styles.ratingBox}>
+                    <Ionicons name="star" size={12} color="#D97706" />
+                    <Text style={styles.ratingText}>4.8</Text>
+                  </View>
+                </View>
+                
+                <Text style={styles.productDesc}>{item.description}</Text>
+                
+                <View style={styles.footerRow}>
+                  <View style={styles.infoGroup}>
+                    <MaterialCommunityIcons name="clock-outline" size={16} color="#6B7280" />
+                    <Text style={styles.infoText}>{item.time}</Text>
+                  </View>
+
+                  <View style={styles.stockBadge}>
+                    <Text style={styles.stockText}>{item.stock} Ürün Kaldı</Text>
+                  </View>
+                </View>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
     </SafeAreaView>
   );
@@ -184,6 +208,24 @@ const styles = StyleSheet.create({
   cardImage: { width: '100%', height: '100%' },
   newBadge: { position: 'absolute', top: 12, left: 12, backgroundColor: '#FFFFFF', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
   newBadgeText: { fontSize: 11, fontWeight: '900', color: '#0A4D44', textTransform: 'uppercase' },
+
+  favoriteBtn: { 
+    position: 'absolute', 
+    top: 12, 
+    right: 12, 
+    backgroundColor: '#FFFFFF', 
+    width: 36, 
+    height: 36, 
+    borderRadius: 18, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3
+  },
+
   logoContainer: { position: 'absolute', bottom: -20, left: 20, padding: 3, backgroundColor: '#FFFFFF', borderRadius: 15, elevation: 5 },
   storeLogo: { width: 50, height: 50, borderRadius: 12 },
   cardContent: { padding: 20, paddingTop: 30 },

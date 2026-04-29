@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { router } from 'expo-router';
 import { 
   View, 
@@ -7,24 +7,106 @@ import {
   TouchableOpacity, 
   Image, 
   SafeAreaView, 
-  StatusBar 
+  StatusBar,
+  ActivityIndicator
 } from 'react-native';
 import { FontAwesome5, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 
+import * as Google from 'expo-auth-session/providers/google';
+import * as Facebook from 'expo-auth-session/providers/facebook'; // YENİ: Facebook kütüphanesi eklendi
+import * as WebBrowser from 'expo-web-browser';
+
+WebBrowser.maybeCompleteAuthSession();
+
 export default function LoginScreen() {
   const [selectedRole, setSelectedRole] = useState<'customer' | 'business' | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [activeProvider, setActiveProvider] = useState<'google' | 'facebook' | null>(null);
+
+  // --- GOOGLE AYARLARI ---
+  const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest({
+    androidClientId: "ANDROID_CLIENT_ID_BURAYA_GELECEK",
+    iosClientId: "IOS_CLIENT_ID_BURAYA_GELECEK",
+    webClientId: "WEB_CLIENT_ID_BURAYA_GELECEK",
+  });
+
+  useEffect(() => {
+    if (googleResponse?.type === 'success') {
+      const googleToken = googleResponse.authentication?.accessToken;
+      if (googleToken) sendTokenToBackend(googleToken, 'google');
+    } else if (googleResponse?.type === 'cancel') {
+      setIsLoading(false);
+      setActiveProvider(null);
+    }
+  }, [googleResponse]);
+
+  // --- FACEBOOK AYARLARI ---
+  const [fbRequest, fbResponse, fbPromptAsync] = Facebook.useAuthRequest({
+    clientId: "FACEBOOK_APP_ID_BURAYA_GELECEK", // YENİ: Facebook Developer portalından alınacak App ID
+  });
+
+  useEffect(() => {
+    if (fbResponse?.type === 'success') {
+      const fbToken = fbResponse.authentication?.accessToken;
+      if (fbToken) sendTokenToBackend(fbToken, 'facebook');
+    } else if (fbResponse?.type === 'cancel') {
+      setIsLoading(false);
+      setActiveProvider(null);
+    }
+  }, [fbResponse]);
+
+
+  // --- BACKEND'E VERİ GÖNDERME ---
+  // YENİ: Hangi platformdan gelindiğini (provider) de gönderiyoruz
+  const sendTokenToBackend = async (token: string, provider: 'google' | 'facebook') => {
+    try {
+      console.log(`${provider} Token ve Rol Backend'e yollanıyor...`);
+      
+      const res = await fetch('https://api.seninsiten.com/api/auth/social', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          token: token,
+          role: selectedRole, 
+          provider: provider // Backend bilecek ki bu token Google'ın mı Facebook'un mu
+        }),
+      });
+
+      // Başarılı olursa içeri al
+      router.replace('/(tabs)/');
+      
+    } catch (error) {
+      console.error("Backend hatası:", error);
+      alert("Giriş yapılırken sunucu hatası oluştu.");
+    } finally {
+      setIsLoading(false);
+      setActiveProvider(null);
+    }
+  };
+
+  const handleGoogleLogin = () => {
+    setIsLoading(true);
+    setActiveProvider('google');
+    googlePromptAsync();
+  };
+
+  const handleFacebookLogin = () => {
+    setIsLoading(true);
+    setActiveProvider('facebook');
+    fbPromptAsync();
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#F7F6F2" />
       
-      {/* Üst Başlık */}
       <View style={styles.headerContainer}>
         <Text style={styles.headerText}>YEMEK KURTARMAYA</Text>
         <Text style={styles.headerText}>BAŞLAYALIM</Text>
       </View>
 
-      {/* Görsel Alanı */}
       <View style={styles.imageContainer}>
         <Image
           source={require('../assets/login_logo.png')}
@@ -33,7 +115,6 @@ export default function LoginScreen() {
         />
       </View>
 
-      {/* Alt İçerik Alanı */}
       <View style={styles.bottomContainer}>
         {!selectedRole ? (
           <View style={styles.roleSelectionContainer}>
@@ -72,7 +153,6 @@ export default function LoginScreen() {
         ) : (
           <View style={styles.authContainer}>
             <View style={styles.authHeader}>
-              {/* Şık ve Modern Geri Butonu */}
               <TouchableOpacity onPress={() => setSelectedRole(null)} style={styles.backButtonCircle}>
                 <Ionicons name="chevron-back" size={22} color="#111827" />
               </TouchableOpacity>
@@ -82,28 +162,52 @@ export default function LoginScreen() {
               <View style={{ width: 40 }} />
             </View>
 
-            {/* Google Butonu - Renkli Logo ile */}
-            <TouchableOpacity style={[styles.button, styles.googleButton]} activeOpacity={0.8}>
+            {/* GOOGLE BUTONU */}
+            <TouchableOpacity 
+              style={[styles.button, styles.googleButton]} 
+              activeOpacity={0.8}
+              disabled={!googleRequest || isLoading}
+              onPress={handleGoogleLogin}
+            >
               <View style={styles.iconWrapper}>
-                <Image 
-                  source={require('../assets/google_logo.png')} 
-                  style={{ width: 22, height: 22 }}
-                  resizeMode="contain"
-                />
+                {isLoading && activeProvider === 'google' ? (
+                  <ActivityIndicator size="small" color="#0A4D44" />
+                ) : (
+                  <Image 
+                    source={require('../assets/google_logo.png')} 
+                    style={{ width: 22, height: 22 }}
+                    resizeMode="contain"
+                  />
+                )}
               </View>
-              <Text style={[styles.buttonText, styles.googleButtonText]}>Google ile devam et</Text>
+              <Text style={[styles.buttonText, styles.googleButtonText]}>
+                {isLoading && activeProvider === 'google' ? 'Bağlanıyor...' : 'Google ile devam et'}
+              </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.button, styles.facebookButton]} activeOpacity={0.8}>
+            {/* FACEBOOK BUTONU */}
+            <TouchableOpacity 
+              style={[styles.button, styles.facebookButton]} 
+              activeOpacity={0.8}
+              disabled={!fbRequest || isLoading}
+              onPress={handleFacebookLogin}
+            >
               <View style={styles.iconWrapper}>
-                <FontAwesome5 name="facebook-f" size={22} color="#FFFFFF" />
+                {isLoading && activeProvider === 'facebook' ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <FontAwesome5 name="facebook-f" size={22} color="#FFFFFF" />
+                )}
               </View>
-              <Text style={styles.buttonText}>Facebook ile devam et</Text>
+              <Text style={styles.buttonText}>
+                {isLoading && activeProvider === 'facebook' ? 'Bağlanıyor...' : 'Facebook ile devam et'}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
               style={[styles.button, styles.emailButton]} 
               activeOpacity={0.8}
+              disabled={isLoading}
               onPress={() => router.push({ pathname: '/email-login', params: { role: selectedRole } })}
             >
               <View style={styles.iconWrapper}>
@@ -238,8 +342,8 @@ const styles = StyleSheet.create({
   iconWrapper: {
     position: 'absolute',
     left: 24,
-    width: 24, // Tüm ikonları hizalamak için sabit genişlik
-    alignItems: 'center', // İkonu/resmi ortala
+    width: 24, 
+    alignItems: 'center', 
     justifyContent: 'center',
   },
   buttonText: {

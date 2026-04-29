@@ -16,7 +16,8 @@ const { width } = Dimensions.get('window');
 
 export default function ShopDetailScreen() {
   const params = useLocalSearchParams();
-  const { name, image, logo, distance } = params;
+  // GÜNCELLENEN KISIM: Hakan'dan gelecek ai_description ve normal description verilerini alıyoruz
+  const { name, image, logo, distance, ai_description, description } = params;
 
   // Ürünler ve Hesaplama Mantığı
   const [products, setProducts] = useState([
@@ -39,14 +40,13 @@ export default function ShopDetailScreen() {
     }));
   };
 
-  // GÜNCELLENEN KISIM: Haritaya işletmenin koordinatlarını ve adını yolluyoruz
   const openMap = () => {
     router.push({
       pathname: '/(tabs)/browse',
       params: { 
-        lat: '40.8532', // ÖRNEK: Keşan enlemi (İleride backend'den gelen veri ile değişecek)
-        lon: '26.6368', // ÖRNEK: Keşan boylamı (İleride backend'den gelen veri ile değişecek)
-        shopName: name // Tıklanan dükkanın adını haritaya gönderiyoruz
+        lat: '40.8532', 
+        lon: '26.6368', 
+        shopName: name 
       }
     });
   };
@@ -78,6 +78,16 @@ export default function ShopDetailScreen() {
               <Text style={styles.distanceText}>{distance} uzaklıkta • Keşan</Text>
             </View>
           </View>
+
+          {/* YAPAY ZEKA (ORTA YOL) ÇÖZÜMÜ BURADA */}
+          {ai_description ? (
+            <View style={styles.aiDescBox}>
+              <Ionicons name="sparkles" size={18} color="#D97706" />
+              <Text style={styles.aiDescText}>{ai_description}</Text>
+            </View>
+          ) : description ? (
+            <Text style={styles.normalDescText}>{description}</Text>
+          ) : null}
 
           <View style={styles.divider} />
 
@@ -185,12 +195,17 @@ const styles = StyleSheet.create({
   mainCard: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 30, borderTopRightRadius: 30, marginTop: -30, padding: 25 },
   storeHeader: { flexDirection: 'row', alignItems: 'center' },
   storeLogo: { width: 50, height: 50, borderRadius: 12, borderWidth: 1, borderColor: '#F3F4F6' },
-  storeTitleInfo: { marginLeft: 12 },
+  storeTitleInfo: { marginLeft: 12, flex: 1 },
   storeName: { fontSize: 18, fontWeight: '800' },
   distanceText: { color: '#6B7280', fontSize: 12 },
+  
+  // EKLENEN YENİ AÇIKLAMA STİLLERİ
+  aiDescBox: { flexDirection: 'row', backgroundColor: '#FFFBEB', padding: 12, borderRadius: 12, marginTop: 15, alignItems: 'flex-start', borderWidth: 1, borderColor: '#FDE68A' },
+  aiDescText: { flex: 1, marginLeft: 8, fontSize: 14, color: '#92400E', fontWeight: '700', lineHeight: 20 },
+  normalDescText: { marginTop: 15, fontSize: 14, color: '#4B5563', lineHeight: 20, fontStyle: 'italic' },
+  
   divider: { height: 1, backgroundColor: '#F3F4F6', marginVertical: 20 },
-  sectionTitle: { fontSize: 17, fontWeight: '800' },
-
+  sectionTitle: { fontSize: 17, fontWeight: '800', marginBottom: 10 },
   productCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F9FAFB', padding: 15, borderRadius: 15, marginBottom: 10 },
   productLeft: { flex: 1 },
   productTitle: { fontSize: 15, fontWeight: '700', color: '#374151' },
