@@ -35,9 +35,9 @@ app.include_router(ai_listings.router,    prefix="/listings",      tags=["AI Lis
 app.include_router(reservations.router,   prefix="/reservations",  tags=["Reservations"])
 app.include_router(analytics.router,      prefix="/analytics",     tags=["Analytics"])
 app.include_router(notifications.router,  prefix="/notifications", tags=["Notifications"])
-app.include_router(ai_integration.router, prefix="/ai",            tags=["AI Integration"])
+app.include_router(ai_integration.router, prefix="", tags=["AI Integration"])
 
-# Uygulama başlarken Scheduler'ı çalıştır [cite: 541]
+
 @app.on_event("startup")
 def startup():
     start_scheduler()

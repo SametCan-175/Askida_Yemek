@@ -20,6 +20,12 @@ def _to_listing_out(listing: Listing) -> ListingOut:
         )
     else:
         obj.discount_percent = 0.0
+
+    if hasattr(listing, 'ai_score') and listing.ai_score:
+        obj.ai_score = listing.ai_score.ai_score
+        obj.badge_text = listing.ai_score.badge_text
+        obj.ai_description = listing.ai_score.ai_description
+        
     return obj
 
 

@@ -155,6 +155,10 @@ class ListingOut(BaseModel):
     created_at: datetime
     shop: Optional[ShopOut] = None
 
+    ai_score: Optional[float] = None
+    badge_text: Optional[str] = None    #Aı için
+    ai_description: Optional[str] = None
+
     model_config = {"from_attributes": True}
 
     @classmethod
