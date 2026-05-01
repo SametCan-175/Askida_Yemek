@@ -13,7 +13,7 @@ import {
 import { FontAwesome5, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 
 import * as Google from 'expo-auth-session/providers/google';
-import * as Facebook from 'expo-auth-session/providers/facebook'; // YENİ: Facebook kütüphanesi eklendi
+import * as Facebook from 'expo-auth-session/providers/facebook'; 
 import * as WebBrowser from 'expo-web-browser';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -24,10 +24,11 @@ export default function LoginScreen() {
   const [activeProvider, setActiveProvider] = useState<'google' | 'facebook' | null>(null);
 
   // --- GOOGLE AYARLARI ---
+  // SENİN VERDİĞİN ID'LER BURAYA EKLENDİ
   const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest({
-    androidClientId: "ANDROID_CLIENT_ID_BURAYA_GELECEK",
-    iosClientId: "IOS_CLIENT_ID_BURAYA_GELECEK",
-    webClientId: "WEB_CLIENT_ID_BURAYA_GELECEK",
+    androidClientId: "649654001622-0frte6auo2gs5b1thggcp3g56knggo6i.apps.googleusercontent.com",
+    iosClientId: "649654001622-8acr8j1ug4msesue1ve7jechtba364g0.apps.googleusercontent.com",
+    webClientId: "649654001622-9e9u59ru9elfjl3tlhm3sskjekp15j4t.apps.googleusercontent.com",
   });
 
   useEffect(() => {
@@ -41,8 +42,9 @@ export default function LoginScreen() {
   }, [googleResponse]);
 
   // --- FACEBOOK AYARLARI ---
+  // SENİN VERDİĞİN APP ID BURAYA EKLENDİ (Secret frontend'de kullanılmaz, backend'de kalmalı)
   const [fbRequest, fbResponse, fbPromptAsync] = Facebook.useAuthRequest({
-    clientId: "FACEBOOK_APP_ID_BURAYA_GELECEK", // YENİ: Facebook Developer portalından alınacak App ID
+    clientId: "1771001127608123", 
   });
 
   useEffect(() => {
@@ -57,7 +59,6 @@ export default function LoginScreen() {
 
 
   // --- BACKEND'E VERİ GÖNDERME ---
-  // YENİ: Hangi platformdan gelindiğini (provider) de gönderiyoruz
   const sendTokenToBackend = async (token: string, provider: 'google' | 'facebook') => {
     try {
       console.log(`${provider} Token ve Rol Backend'e yollanıyor...`);
@@ -70,7 +71,7 @@ export default function LoginScreen() {
         body: JSON.stringify({ 
           token: token,
           role: selectedRole, 
-          provider: provider // Backend bilecek ki bu token Google'ın mı Facebook'un mu
+          provider: provider 
         }),
       });
 
