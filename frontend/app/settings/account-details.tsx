@@ -10,13 +10,14 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
-  Alert
+  Alert,
+  Image // YENİ: Fotoğrafı ekranda göstermek için eklendi
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker'; // YENİ: Galeriye erişim paketi
 
 export default function AccountDetails() {
-  // Görseldeki tüm alanları kapsayan state
   const [userInfo, setUserInfo] = useState({
     name: 'Berkay',
     surname: 'Uygulama Kullanıcısı',
@@ -31,6 +32,32 @@ export default function AccountDetails() {
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingField, setEditingField] = useState({ key: '', label: '', value: '' });
+  
+  // YENİ: Seçilen profil fotoğrafının linkini (URI) tutacak state
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+
+  // YENİ: Galeriyi açıp fotoğraf seçtiren fonksiyon
+  const pickImage = async () => {
+    // Önce kullanıcıdan galeriye erişim izni istiyoruz
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    
+    if (status !== 'granted') {
+      Alert.alert('Hata', 'Fotoğraf seçmek için galeri iznine ihtiyacımız var kanka!');
+      return;
+    }
+
+    // Galeriyi açıyoruz
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true, // Kullanıcı fotoğrafı kırpabilsin
+      aspect: [1, 1], // Yuvarlak alana tam otursun diye kare (1:1) oranında kırpmaya zorluyoruz
+      quality: 0.8, // Fotoğraf kalitesi (0 ile 1 arası)
+    });
+
+    if (!result.canceled) {
+      setProfileImage(result.assets[0].uri); // Seçilen fotoğrafı state'e kaydediyoruz
+    }
+  };
 
   const openEditModal = (key: string, label: string, value: string) => {
     setEditingField({ key, label, value });
@@ -42,7 +69,6 @@ export default function AccountDetails() {
     setModalVisible(false);
   };
 
-  // Görseldeki o şık satır yapısı
   const DetailRow = ({ label, value, icon, fieldKey, isLast = false }: any) => (
     <TouchableOpacity 
       style={[styles.detailItem, isLast && { borderBottomWidth: 0 }]} 
@@ -64,7 +90,6 @@ export default function AccountDetails() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={26} color="#111827" />
@@ -75,13 +100,19 @@ export default function AccountDetails() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         
-        {/* Üst Profil Kartı (Görseldeki gibi dairesel ve gölgeli) */}
         <View style={styles.profileSection}>
           <View style={styles.avatarWrapper}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{userInfo.name[0]}{userInfo.surname[0]}</Text>
+              {/* YENİ: Eğer fotoğraf seçildiyse fotoğrafı, seçilmediyse ismin baş harflerini göster */}
+              {profileImage ? (
+                <Image source={{ uri: profileImage }} style={styles.uploadedImage} />
+              ) : (
+                <Text style={styles.avatarText}>{userInfo.name[0]}{userInfo.surname[0]}</Text>
+              )}
             </View>
-            <TouchableOpacity style={styles.cameraBtn}>
+            
+            {/* YENİ: Butona pickImage fonksiyonunu bağladık */}
+            <TouchableOpacity style={styles.cameraBtn} onPress={pickImage} activeOpacity={0.8}>
               <Ionicons name="camera" size={16} color="#FFF" />
             </TouchableOpacity>
           </View>
@@ -89,7 +120,6 @@ export default function AccountDetails() {
           <Text style={styles.userStatus}>Trakya Üniversitesi / Öğrenci</Text>
         </View>
 
-        {/* KİŞİSEL BİLGİLER GRUBU */}
         <Text style={styles.groupLabel}>KİŞİSEL BİLGİLER</Text>
         <View style={styles.infoGroup}>
           <DetailRow icon="account-outline" label="Ad" value={userInfo.name} fieldKey="name" />
@@ -98,14 +128,12 @@ export default function AccountDetails() {
           <DetailRow icon="gender-male-female" label="Cinsiyet" value={userInfo.gender} fieldKey="gender" isLast={true} />
         </View>
 
-        {/* İLETİŞİM BİLGİLERİ GRUBU */}
         <Text style={styles.groupLabel}>İLETİŞİM BİLGİLERİ</Text>
         <View style={styles.infoGroup}>
           <DetailRow icon="email-outline" label="E-posta" value={userInfo.email} fieldKey="email" />
           <DetailRow icon="phone-outline" label="Telefon" value={userInfo.phone} fieldKey="phone" isLast={true} />
         </View>
 
-        {/* ADRES BİLGİLERİ GRUBU */}
         <Text style={styles.groupLabel}>ADRES BİLGİLERİ</Text>
         <View style={styles.infoGroup}>
           <DetailRow icon="city-variant-outline" label="Şehir" value={userInfo.city} fieldKey="city" />
@@ -119,7 +147,6 @@ export default function AccountDetails() {
 
       </ScrollView>
 
-      {/* Düzenleme Modalı */}
       <Modal animationType="slide" transparent visible={modalVisible}>
         <View style={styles.modalOverlay}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalContent}>
@@ -155,8 +182,12 @@ const styles = StyleSheet.create({
 
   profileSection: { alignItems: 'center', paddingVertical: 30, backgroundColor: '#FFF', borderBottomLeftRadius: 30, borderBottomRightRadius: 30, elevation: 2 },
   avatarWrapper: { position: 'relative', marginBottom: 15 },
-  avatar: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#0A4D44', justifyContent: 'center', alignItems: 'center' },
+  avatar: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#0A4D44', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }, // YENİ: overflow hidden eklendi
   avatarText: { fontSize: 32, fontWeight: '800', color: '#FFF' },
+  
+  // YENİ: Seçilen fotoğrafın stili
+  uploadedImage: { width: '100%', height: '100%', borderRadius: 45 },
+
   cameraBtn: { position: 'absolute', bottom: 0, right: 0, backgroundColor: '#374151', width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#FFF' },
   userName: { fontSize: 20, fontWeight: '800', color: '#111827' },
   userStatus: { fontSize: 13, color: '#6B7280', marginTop: 4 },
