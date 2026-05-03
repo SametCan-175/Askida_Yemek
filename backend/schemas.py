@@ -146,7 +146,7 @@ class ListingOut(BaseModel):
     description: Optional[str]
     original_price: float
     discounted_price: float
-    discount_percent: float   # Hesaplanmış alan
+    discount_percent: float
     quantity: int
     pickup_start: datetime
     pickup_end: datetime
@@ -155,8 +155,9 @@ class ListingOut(BaseModel):
     created_at: datetime
     shop: Optional[ShopOut] = None
 
+    # ── AI ALANLARI (opsiyonel) ──
     ai_score: Optional[float] = None
-    badge_text: Optional[str] = None    #Aı için
+    badge_text: Optional[str] = None
     ai_description: Optional[str] = None
 
     model_config = {"from_attributes": True}

@@ -2,18 +2,39 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, joinedload
 from typing import Optional
 from datetime import datetime, timezone
+from math import radians, cos, sin, asin, sqrt
+import logging
 
 from database import get_db
-from models import Listing, ListingStatus, Shop, User
+from models import Listing, ListingStatus, ListingAiScore, Shop, User
 from schemas import ListingCreate, ListingOut, ListingList
 from security import get_current_user, require_business
+from services.ai_service import AIService
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+# AI servisi tek instance — module-level
+ai_service = AIService()
+
+
+def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """İki koordinat arası km cinsinden mesafe."""
+    R = 6371
+    d_lat = radians(lat2 - lat1)
+    d_lon = radians(lon2 - lon1)
+    a = (
+        sin(d_lat / 2) ** 2
+        + cos(radians(lat1)) * cos(radians(lat2)) * sin(d_lon / 2) ** 2
+    )
+    return round(R * 2 * asin(sqrt(a)), 2)
 
 
 def _to_listing_out(listing: Listing) -> ListingOut:
-    """ORM nesnesini discount_percent ile birlikte schema'ya çevirir."""
+    """ORM nesnesini schema'ya çevirir, varsa AI skorlarını da ekler."""
     obj = ListingOut.model_validate(listing)
+
+    # Discount hesapla
     if listing.original_price > 0:
         obj.discount_percent = round(
             (1 - listing.discounted_price / listing.original_price) * 100, 1
@@ -21,33 +42,57 @@ def _to_listing_out(listing: Listing) -> ListingOut:
     else:
         obj.discount_percent = 0.0
 
-    if hasattr(listing, 'ai_score') and listing.ai_score:
-        obj.ai_score = listing.ai_score.ai_score
-        obj.badge_text = listing.ai_score.badge_text
-        obj.ai_description = listing.ai_score.ai_description
-        
+    # Eğer canlı AI çağrısından gelen değerler varsa onları kullan
+    if hasattr(listing, "_ai_score"):
+        obj.ai_score = getattr(listing, "_ai_score", None)
+        obj.badge_text = getattr(listing, "_badge_text", None)
+        obj.ai_description = getattr(listing, "_ai_description", None)
+    else:
+        # DB'de kayıtlı AI skoru varsa onu kullan
+        ai_data = listing.ai_score
+        if ai_data:
+            ai_record = ai_data[0] if isinstance(ai_data, list) else ai_data
+            obj.ai_score = ai_record.ai_score
+            obj.badge_text = ai_record.badge_text
+            obj.ai_description = ai_record.ai_description
+
     return obj
 
 
 @router.get("", response_model=ListingList)
 def list_listings(
-    shop_id: Optional[int] = Query(None, description="Belirli bir işletmenin fırsatlarını getir"),
+    shop_id: Optional[int] = Query(None, description="Belirli bir işletmenin fırsatları"),
     city: Optional[str] = Query(None, description="Şehre göre filtrele"),
     max_price: Optional[float] = Query(None, description="Maksimum indirimli fiyat"),
     status: Optional[ListingStatus] = Query(ListingStatus.active, description="Durum filtresi"),
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
+    # ── AI / KONUM PARAMETRELERİ ──
+    lat: Optional[float] = Query(None, description="Kullanıcı enlemi"),
+    lon: Optional[float] = Query(None, description="Kullanıcı boylamı"),
+    radius: Optional[float] = Query(2.0, description="Yarıçap (km), default 2"),
+    user_id: Optional[int] = Query(None, description="Kişiselleştirme için user_id"),
     db: Session = Depends(get_db),
 ):
     """
-    Aktif fırsatları listele. Şehir, fiyat ve işletme filtreleri desteklenir.
-    Sonuçlar oluşturulma tarihine göre yeniden eskiye sıralanır.
+    Aktif fırsatları listele.
+
+    - `lat` + `lon` verilirse: konuma göre `radius` km içindekiler döner, mesafeye göre sıralı
+    - `lat` + `lon` + `user_id` verilirse: AI servisinden canlı skor çekilir
+    - Hiçbiri verilmezse: standart liste (filtre destekli)
+
+    AI servisi offline ise: skorlar `null` döner, endpoint çalışmaya devam eder.
     """
+    now = datetime.now(timezone.utc)
+
     q = (
         db.query(Listing)
         .join(Shop)
         .options(joinedload(Listing.shop))
-        .filter(Shop.is_active == True)
+        .filter(
+            Shop.is_active == True,
+            Listing.pickup_end >= now,
+        )
     )
 
     if status:
@@ -59,12 +104,79 @@ def list_listings(
     if max_price is not None:
         q = q.filter(Listing.discounted_price <= max_price)
 
-    # Sadece teslim süresi geçmemiş fırsatlar
-    now = datetime.now(timezone.utc)
-    q = q.filter(Listing.pickup_end >= now)
+    listings = q.order_by(Listing.created_at.desc()).all()
 
-    total = q.count()
-    listings = q.order_by(Listing.created_at.desc()).offset(skip).limit(limit).all()
+    # ── KONUM FİLTRESİ ──
+    if lat is not None and lon is not None:
+        in_radius = []
+        for l in listings:
+            if l.shop and l.shop.latitude is not None and l.shop.longitude is not None:
+                dist = haversine_km(lat, lon, l.shop.latitude, l.shop.longitude)
+                if dist <= radius:
+                    l._distance = dist
+                    in_radius.append(l)
+        listings = sorted(in_radius, key=lambda x: x._distance)
+
+    # Pagination (AI çağrısından önce)
+    total = len(listings)
+    listings = listings[skip : skip + limit]
+
+    # ── AI ÇAĞRISI ──
+    if user_id is not None and lat is not None and lon is not None and listings:
+        ai_payload = [
+            {
+                "listing_id": l.id,
+                "kafe": l.shop.name if l.shop else "",
+                "kategori": l.shop.category if l.shop else "",
+                "urun": l.title,
+                "aciklama": l.description or "",
+                "indirim_orani": round(
+                    (1 - l.discounted_price / l.original_price) * 100, 1
+                ) if l.original_price > 0 else 0.0,
+                "fiyat": l.discounted_price,
+                "mesafe_km": getattr(l, "_distance", 0.0),
+            }
+            for l in listings
+        ]
+
+        user_context = {
+            "id": user_id,
+            "location": {"latitude": lat, "longitude": lon},
+            "preferred_radius_km": radius,
+        }
+
+        scored = ai_service.score_listings(user_context, ai_payload)
+
+        # Skorları listing nesnelerine inject et + DB'ye kaydet
+        scores_by_id = {s["listing_id"]: s for s in scored}
+        for l in listings:
+            s = scores_by_id.get(l.id)
+            if s:
+                l._ai_score = s.get("ai_score")
+                l._badge_text = s.get("badge_text")
+                l._ai_description = s.get("ai_description")
+
+                # DB'ye yaz (cache amaçlı, AI offline olunca eski skor görünsün)
+                existing = db.query(ListingAiScore).filter(
+                    ListingAiScore.listing_id == l.id
+                ).first()
+                if existing:
+                    existing.ai_score = s.get("ai_score")
+                    existing.badge_text = s.get("badge_text")
+                    existing.ai_description = s.get("ai_description")
+                else:
+                    db.add(ListingAiScore(
+                        listing_id=l.id,
+                        ai_score=s.get("ai_score"),
+                        badge_text=s.get("badge_text"),
+                        ai_description=s.get("ai_description"),
+                    ))
+
+        try:
+            db.commit()
+        except Exception as e:
+            logger.error(f"AI skor DB kaydı hatası: {e}")
+            db.rollback()
 
     return ListingList(
         total=total,
@@ -92,9 +204,7 @@ def create_listing(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_business),
 ):
-    """
-    Yeni fırsat ilanı oluştur. Sadece **business** rolü ve işletmesi olan kullanıcılar kullanabilir.
-    """
+    """Yeni fırsat ilanı oluştur. Sadece business rolü."""
     shop = db.query(Shop).filter(
         Shop.owner_id == current_user.id, Shop.is_active == True
     ).first()
@@ -108,10 +218,7 @@ def create_listing(
     db.add(listing)
     db.commit()
     db.refresh(listing)
-
-    # shop ilişkisini yükle
-    db.refresh(listing)
-    listing.shop  # eager load trigger
+    listing.shop  # eager load
     return _to_listing_out(listing)
 
 
@@ -122,7 +229,7 @@ def update_listing_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_business),
 ):
-    """Fırsatın durumunu güncelle: `active`, `sold_out`, `expired`."""
+    """Fırsatın durumunu güncelle: active, sold_out, expired."""
     listing = db.query(Listing).options(joinedload(Listing.shop)).filter(
         Listing.id == listing_id
     ).first()
@@ -130,7 +237,6 @@ def update_listing_status(
         raise HTTPException(status_code=404, detail="Fırsat bulunamadı.")
     if listing.shop.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Bu fırsatı düzenleme yetkiniz yok.")
-
     listing.status = new_status
     db.commit()
     db.refresh(listing)
@@ -143,14 +249,11 @@ def delete_listing(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_business),
 ):
-    """Fırsatı sil (sadece sahibi silebilir)."""
-    listing = db.query(Listing).join(Shop).filter(
-        Listing.id == listing_id
-    ).first()
+    """Fırsatı sil (sadece sahibi)."""
+    listing = db.query(Listing).join(Shop).filter(Listing.id == listing_id).first()
     if not listing:
         raise HTTPException(status_code=404, detail="Fırsat bulunamadı.")
     if listing.shop.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Bu fırsatı silme yetkiniz yok.")
-
     db.delete(listing)
     db.commit()

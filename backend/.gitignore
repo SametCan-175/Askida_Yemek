@@ -1,2 +1,4 @@
 .venv/
 backend/askida_yemek.db
+__pycache__/
+*.pyc
