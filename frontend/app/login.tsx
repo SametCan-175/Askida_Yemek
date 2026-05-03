@@ -12,92 +12,8 @@ import {
 } from 'react-native';
 import { FontAwesome5, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 
-import * as Google from 'expo-auth-session/providers/google';
-import * as Facebook from 'expo-auth-session/providers/facebook'; 
-import * as WebBrowser from 'expo-web-browser';
-
-WebBrowser.maybeCompleteAuthSession();
-
 export default function LoginScreen() {
   const [selectedRole, setSelectedRole] = useState<'customer' | 'business' | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [activeProvider, setActiveProvider] = useState<'google' | 'facebook' | null>(null);
-
-  // --- GOOGLE AYARLARI ---
-  // SENİN VERDİĞİN ID'LER BURAYA EKLENDİ
-  const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest({
-    androidClientId: "649654001622-0frte6auo2gs5b1thggcp3g56knggo6i.apps.googleusercontent.com",
-    iosClientId: "649654001622-8acr8j1ug4msesue1ve7jechtba364g0.apps.googleusercontent.com",
-    webClientId: "649654001622-9e9u59ru9elfjl3tlhm3sskjekp15j4t.apps.googleusercontent.com",
-  });
-
-  useEffect(() => {
-    if (googleResponse?.type === 'success') {
-      const googleToken = googleResponse.authentication?.accessToken;
-      if (googleToken) sendTokenToBackend(googleToken, 'google');
-    } else if (googleResponse?.type === 'cancel') {
-      setIsLoading(false);
-      setActiveProvider(null);
-    }
-  }, [googleResponse]);
-
-  // --- FACEBOOK AYARLARI ---
-  // SENİN VERDİĞİN APP ID BURAYA EKLENDİ (Secret frontend'de kullanılmaz, backend'de kalmalı)
-  const [fbRequest, fbResponse, fbPromptAsync] = Facebook.useAuthRequest({
-    clientId: "1771001127608123", 
-  });
-
-  useEffect(() => {
-    if (fbResponse?.type === 'success') {
-      const fbToken = fbResponse.authentication?.accessToken;
-      if (fbToken) sendTokenToBackend(fbToken, 'facebook');
-    } else if (fbResponse?.type === 'cancel') {
-      setIsLoading(false);
-      setActiveProvider(null);
-    }
-  }, [fbResponse]);
-
-
-  // --- BACKEND'E VERİ GÖNDERME ---
-  const sendTokenToBackend = async (token: string, provider: 'google' | 'facebook') => {
-    try {
-      console.log(`${provider} Token ve Rol Backend'e yollanıyor...`);
-      
-      const res = await fetch('https://api.seninsiten.com/api/auth/social', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          token: token,
-          role: selectedRole, 
-          provider: provider 
-        }),
-      });
-
-      // Başarılı olursa içeri al
-      router.replace('/(tabs)/');
-      
-    } catch (error) {
-      console.error("Backend hatası:", error);
-      alert("Giriş yapılırken sunucu hatası oluştu.");
-    } finally {
-      setIsLoading(false);
-      setActiveProvider(null);
-    }
-  };
-
-  const handleGoogleLogin = () => {
-    setIsLoading(true);
-    setActiveProvider('google');
-    googlePromptAsync();
-  };
-
-  const handleFacebookLogin = () => {
-    setIsLoading(true);
-    setActiveProvider('facebook');
-    fbPromptAsync();
-  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -118,6 +34,7 @@ export default function LoginScreen() {
 
       <View style={styles.bottomContainer}>
         {!selectedRole ? (
+          // Rol seçimi (eskisi gibi - hiçbir şey değişmedi)
           <View style={styles.roleSelectionContainer}>
             <Text style={styles.sectionTitle}>Nasıl devam etmek istersin?</Text>
             
@@ -152,6 +69,7 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
         ) : (
+          // Auth seçenekleri - SADECE EMAIL kalıyor
           <View style={styles.authContainer}>
             <View style={styles.authHeader}>
               <TouchableOpacity onPress={() => setSelectedRole(null)} style={styles.backButtonCircle}>
@@ -163,52 +81,10 @@ export default function LoginScreen() {
               <View style={{ width: 40 }} />
             </View>
 
-            {/* GOOGLE BUTONU */}
-            <TouchableOpacity 
-              style={[styles.button, styles.googleButton]} 
-              activeOpacity={0.8}
-              disabled={!googleRequest || isLoading}
-              onPress={handleGoogleLogin}
-            >
-              <View style={styles.iconWrapper}>
-                {isLoading && activeProvider === 'google' ? (
-                  <ActivityIndicator size="small" color="#0A4D44" />
-                ) : (
-                  <Image 
-                    source={require('../assets/google_logo.png')} 
-                    style={{ width: 22, height: 22 }}
-                    resizeMode="contain"
-                  />
-                )}
-              </View>
-              <Text style={[styles.buttonText, styles.googleButtonText]}>
-                {isLoading && activeProvider === 'google' ? 'Bağlanıyor...' : 'Google ile devam et'}
-              </Text>
-            </TouchableOpacity>
-
-            {/* FACEBOOK BUTONU */}
-            <TouchableOpacity 
-              style={[styles.button, styles.facebookButton]} 
-              activeOpacity={0.8}
-              disabled={!fbRequest || isLoading}
-              onPress={handleFacebookLogin}
-            >
-              <View style={styles.iconWrapper}>
-                {isLoading && activeProvider === 'facebook' ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <FontAwesome5 name="facebook-f" size={22} color="#FFFFFF" />
-                )}
-              </View>
-              <Text style={styles.buttonText}>
-                {isLoading && activeProvider === 'facebook' ? 'Bağlanıyor...' : 'Facebook ile devam et'}
-              </Text>
-            </TouchableOpacity>
-
+            {/* Sadece email butonu kaldı */}
             <TouchableOpacity 
               style={[styles.button, styles.emailButton]} 
               activeOpacity={0.8}
-              disabled={isLoading}
               onPress={() => router.push({ pathname: '/email-login', params: { role: selectedRole } })}
             >
               <View style={styles.iconWrapper}>
@@ -216,11 +92,14 @@ export default function LoginScreen() {
               </View>
               <Text style={styles.buttonText}>E-posta ile devam et</Text>
             </TouchableOpacity>
+
+          
           </View>
         )}
       </View>
     </SafeAreaView>
   );
+  
 }
 
 const styles = StyleSheet.create({
@@ -366,4 +245,5 @@ const styles = StyleSheet.create({
   emailButton: {
     backgroundColor: '#0A4D44',
   },
+  
 });

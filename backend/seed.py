@@ -40,12 +40,12 @@ def seed():
         owner_id=business_user.id,
         name="Ayşe'nin Fırını",
         description="Her gün taze ekmek ve pogaça",
-        address="Bağdat Caddesi No:42",
-        city="İstanbul",
+        address="Yukarıkışla Mah. İstiklal Cad. No:42",
+        city="edirne",
         phone="0216 000 00 00",
         category="fırın",
-        latitude=40.9612,
-        longitude=29.0700,
+        latitude=40.8533,    # Keşan merkez
+        longitude=26.6300
     )
     db.add(shop)
     db.commit()

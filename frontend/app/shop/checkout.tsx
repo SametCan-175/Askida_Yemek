@@ -6,17 +6,26 @@ import {
   TouchableOpacity, 
   SafeAreaView, 
   Modal,
-  ScrollView
+  ScrollView,
+  ActivityIndicator
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
+
+import { createReservation } from '../../services/reservations';
 
 export default function CheckoutScreen() {
   const params = useLocalSearchParams();
   const { storeName, totalItems, totalPrice, time } = params;
 
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState({ id: 'card', name: 'Kredi / Banka Kartı', icon: 'credit-card', color: '#111827' });
+  const [selectedPayment, setSelectedPayment] = useState({ 
+    id: 'card', 
+    name: 'Kredi / Banka Kartı', 
+    icon: 'credit-card', 
+    color: '#111827' 
+  });
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const PAYMENT_METHODS = [
     { id: 'card', name: 'Kredi / Banka Kartı', icon: 'credit-card', color: '#111827' },
@@ -28,20 +37,35 @@ export default function CheckoutScreen() {
   const tax = subtotal * 0.01;
   const finalTotal = subtotal + tax;
 
-  // DİNAMİK SİPARİŞ OLUŞTURMA FONKSİYONU
-  const handleCompleteOrder = () => {
-    // Benzersiz bir Sipariş ID'si oluşturuyoruz (Örn: SL-8F4A2C)
-    const uniqueOrderId = 'SL-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+  // GERÇEK SİPARİŞ OLUŞTURMA
+  const handleCompleteOrder = async () => {
+    const listingId = parseInt(params.listing_id as string);
+    const itemCount = parseInt(params.totalItems as string);
     
-    // Yönlendirme yaparken bu ID'yi de beraberinde gönderiyoruz
-    router.replace({
-      pathname: '/shop/order-success',
-      params: { 
-        storeName: storeName, 
-        time: time,
-        orderId: uniqueOrderId
-      }
-    });
+    if (!listingId || !itemCount) {
+      alert('Sipariş bilgisi eksik.');
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const reservation = await createReservation({
+        listing_id: listingId,
+        quantity: itemCount,
+      });
+
+      router.replace({
+        pathname: '/shop/order-success',
+        params: { 
+          storeName: storeName,
+          time: time,
+          orderId: `SL-${reservation.id.toString().padStart(6, '0')}`,
+        }
+      });
+    } catch (err: any) {
+      alert(err.message || 'Sipariş oluşturulamadı.');
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -110,9 +134,12 @@ export default function CheckoutScreen() {
         </View>
         <TouchableOpacity 
           style={styles.payButton}
-          onPress={handleCompleteOrder} // Butonu yeni fonksiyona bağladık
+          onPress={handleCompleteOrder}
+          disabled={isProcessing}
         >
-          {selectedPayment.id === 'gpay' ? (
+          {isProcessing ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : selectedPayment.id === 'gpay' ? (
             <FontAwesome5 name="google-pay" size={32} color="#FFFFFF" />
           ) : selectedPayment.id === 'apple' ? (
             <FontAwesome5 name="apple-pay" size={32} color="#FFFFFF" />

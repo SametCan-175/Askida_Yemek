@@ -1,3 +1,4 @@
+import { useAuth } from '../../contexts/AuthContext'; // Yol dosyaya göre değişir
 import React, { useState } from 'react';
 import { 
   View, 
@@ -13,7 +14,7 @@ import { router } from 'expo-router';
 
 export default function ProfileScreen() {
   const [showInviteCard, setShowInviteCard] = useState(true);
-
+  const { user, logout } = useAuth();
   const handleShare = async () => {
     try {
       await Share.share({
@@ -28,7 +29,7 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Ionicons name="happy-outline" size={32} color="#0A4D44" />
-        <Text style={styles.headerName}>Berkay</Text>
+        <Text style={styles.headerName}>{user?.full_name || 'Kullanıcı'}</Text>
         <TouchableOpacity style={styles.settingsBtn} onPress={() => router.push('/settings')}>
           <Ionicons name="settings-outline" size={26} color="#0A4D44" />
         </TouchableOpacity>

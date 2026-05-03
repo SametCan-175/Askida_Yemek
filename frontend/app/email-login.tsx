@@ -1,82 +1,176 @@
 import React, { useState } from 'react';
 import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TextInput, 
-  TouchableOpacity, 
-  SafeAreaView 
+  View, Text, StyleSheet, TextInput, TouchableOpacity, 
+  SafeAreaView, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router'; 
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function EmailLoginScreen() {
-  const [email, setEmail] = useState('');
-  const [isChecked, setIsChecked] = useState(false);
-  
-  const { role } = useLocalSearchParams();
+  const { role } = useLocalSearchParams<{ role: 'customer' | 'business' }>();
+  const { login, register } = useAuth();
 
-  const handleContinue = () => {
-    if (role === 'business') {
-      // İşletme seçildiyse Adım 1'e git
-      router.push('/business/store-setup'); 
-    } else {
-      // Müşteri seçildiyse normal akış
-      router.push('/surprise-info');
+  // Login mu Register mı?
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    // Validation
+    if (!email.trim() || !password.trim()) {
+      Alert.alert('Eksik bilgi', 'E-posta ve şifre gerekli.');
+      return;
+    }
+    if (isRegisterMode && !name.trim()) {
+      Alert.alert('Eksik bilgi', 'Lütfen adını gir.');
+      return;
+    }
+    if (password.length < 6) {
+      Alert.alert('Şifre kısa', 'Şifre en az 6 karakter olmalı.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      if (isRegisterMode) {
+        // Yeni kullanıcı kaydı
+        await register(
+          email.trim().toLowerCase(),
+          password,
+          name.trim(),
+          (role || 'customer') as 'customer' | 'business'
+        );
+        // Müşteri kaydı sonrası onboarding'e, işletme ise mağaza setup'a
+        if (role === 'business') {
+          router.replace('/business/store-setup');
+        } else {
+          router.replace('/surprise-info');
+        }
+      } else {
+        // Mevcut kullanıcı girişi
+        await login(email.trim().toLowerCase(), password);
+        router.replace('/(tabs)');
+      }
+    } catch (error: any) {
+      Alert.alert(
+        isRegisterMode ? 'Kayıt başarısız' : 'Giriş başarısız',
+        error.message || 'Bir şeyler ters gitti. Tekrar dene.'
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <MaterialIcons name="arrow-back-ios" size={20} color="#1f2937" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {role === 'business' ? 'İşletme Girişi' : 'Kayıt ol veya giriş yap'}
-        </Text>
-        <View style={{ width: 20 }} /> 
-      </View>
-
-      <View style={styles.content}>
-        <Text style={styles.label}>E-posta</Text>
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder="E-posta adresin nedir?"
-            placeholderTextColor="#9CA3AF"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
+        style={{ flex: 1 }}
+      >
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <MaterialIcons name="arrow-back-ios" size={20} color="#1f2937" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>
+            {role === 'business' ? 'İşletme' : 'Müşteri'} {isRegisterMode ? 'Kaydı' : 'Girişi'}
+          </Text>
+          <View style={{ width: 20 }} /> 
         </View>
 
-        <TouchableOpacity 
-          style={styles.checkboxContainer} 
-          activeOpacity={0.7}
-          onPress={() => setIsChecked(!isChecked)}
-        >
-          <View style={[styles.checkbox, isChecked && styles.checkboxChecked]}>
-            {isChecked && <MaterialIcons name="check" size={16} color="#FFFFFF" />}
+        <ScrollView contentContainerStyle={styles.content}>
+          {/* Mod Switcher */}
+          <View style={styles.tabContainer}>
+            <TouchableOpacity 
+              style={[styles.tab, !isRegisterMode && styles.activeTab]}
+              onPress={() => setIsRegisterMode(false)}
+            >
+              <Text style={[styles.tabText, !isRegisterMode && styles.activeTabText]}>Giriş Yap</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.tab, isRegisterMode && styles.activeTab]}
+              onPress={() => setIsRegisterMode(true)}
+            >
+              <Text style={[styles.tabText, isRegisterMode && styles.activeTabText]}>Kayıt Ol</Text>
+            </TouchableOpacity>
           </View>
-          <Text style={styles.checkboxText}>
-            E-posta adresimin ve adımın gizlilik politikasına uygun olarak saklanmasına izin veriyorum.
-          </Text>
-        </TouchableOpacity>
-      </View>
 
-      <View style={styles.footer}>
-        <TouchableOpacity 
-          style={[styles.continueButton, (email.length > 0 && isChecked) ? styles.buttonActive : styles.buttonInactive]}
-          disabled={!(email.length > 0 && isChecked)}
-          onPress={handleContinue}
-        >
-          <Text style={[styles.continueButtonText, (email.length > 0 && isChecked) ? styles.textActive : styles.textInactive]}>
-            Devam et
-          </Text>
-        </TouchableOpacity>
-      </View>
+          {/* Ad alanı (sadece register'da) */}
+          {isRegisterMode && (
+            <>
+              <Text style={styles.label}>Ad Soyad</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="person-outline" size={20} color="#6B7280" />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Adın ve soyadın"
+                  placeholderTextColor="#9CA3AF"
+                  value={name}
+                  onChangeText={setName}
+                  editable={!isLoading}
+                />
+              </View>
+            </>
+          )}
+
+          {/* Email */}
+          <Text style={styles.label}>E-posta</Text>
+          <View style={styles.inputContainer}>
+            <Ionicons name="mail-outline" size={20} color="#6B7280" />
+            <TextInput
+              style={styles.input}
+              placeholder="ornek@email.com"
+              placeholderTextColor="#9CA3AF"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!isLoading}
+            />
+          </View>
+
+          {/* Şifre */}
+          <Text style={styles.label}>Şifre</Text>
+          <View style={styles.inputContainer}>
+            <Ionicons name="lock-closed-outline" size={20} color="#6B7280" />
+            <TextInput
+              style={styles.input}
+              placeholder="En az 6 karakter"
+              placeholderTextColor="#9CA3AF"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              editable={!isLoading}
+            />
+          </View>
+
+          {!isRegisterMode && (
+            <Text style={styles.helperText}>
+              Hesabın yok mu? Yukarıdan "Kayıt Ol" sekmesini seç.
+            </Text>
+          )}
+        </ScrollView>
+
+        <View style={styles.footer}>
+          <TouchableOpacity 
+            style={[styles.continueButton, isLoading && styles.buttonDisabled]}
+            disabled={isLoading}
+            onPress={handleSubmit}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.continueButtonText}>
+                {isRegisterMode ? 'Kayıt Ol' : 'Giriş Yap'}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -86,19 +180,22 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, height: 60, marginTop: 10 },
   backButton: { padding: 5 },
   headerTitle: { fontSize: 18, fontWeight: '700', color: '#1f2937' },
-  content: { flex: 1, paddingHorizontal: 20, paddingTop: 30 },
-  label: { fontSize: 16, fontWeight: '700', color: '#1f2937', marginBottom: 8 },
-  inputContainer: { backgroundColor: '#F3F4F6', borderRadius: 12, paddingHorizontal: 16, height: 56, justifyContent: 'center', marginBottom: 24 },
-  input: { fontSize: 16, color: '#1f2937' },
-  checkboxContainer: { flexDirection: 'row', alignItems: 'flex-start', paddingRight: 10 },
-  checkbox: { width: 24, height: 24, borderWidth: 2, borderColor: '#0A4D44', borderRadius: 4, marginRight: 12, marginTop: 2, justifyContent: 'center', alignItems: 'center' },
-  checkboxChecked: { backgroundColor: '#0A4D44' },
-  checkboxText: { flex: 1, fontSize: 15, color: '#374151', lineHeight: 22 },
+  content: { padding: 20, paddingTop: 20 },
+  
+  tabContainer: { flexDirection: 'row', backgroundColor: '#F3F4F6', borderRadius: 12, padding: 4, marginBottom: 30 },
+  tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 10 },
+  activeTab: { backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  tabText: { fontSize: 14, fontWeight: '700', color: '#9CA3AF' },
+  activeTabText: { color: '#0A4D44' },
+
+  label: { fontSize: 14, fontWeight: '700', color: '#374151', marginBottom: 8, marginLeft: 4 },
+  inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', borderRadius: 12, paddingHorizontal: 16, height: 56, marginBottom: 20, gap: 10 },
+  input: { flex: 1, fontSize: 16, color: '#1f2937' },
+
+  helperText: { fontSize: 13, color: '#6B7280', textAlign: 'center', marginTop: 10 },
+
   footer: { paddingHorizontal: 20, paddingBottom: 40 },
-  continueButton: { height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center' },
-  buttonInactive: { backgroundColor: '#D1D5DB' },
-  buttonActive: { backgroundColor: '#0A4D44' },
-  continueButtonText: { fontSize: 16, fontWeight: '700' },
-  textInactive: { color: '#9CA3AF' },
-  textActive: { color: '#FFFFFF' },
+  continueButton: { height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0A4D44' },
+  buttonDisabled: { opacity: 0.6 },
+  continueButtonText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
 });

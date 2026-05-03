@@ -1,3 +1,4 @@
+import { useAuth } from '../../contexts/AuthContext'; // Yol dosyaya göre değişir
 import React from 'react';
 import { 
   View, 
@@ -9,7 +10,6 @@ import {
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-
 const SettingsRow = ({ icon, label, isLast = false, onPress }: any) => (
   <TouchableOpacity 
     style={[styles.rowContainer, isLast && styles.lastRow]} 
@@ -25,6 +25,7 @@ const SettingsRow = ({ icon, label, isLast = false, onPress }: any) => (
 );
 
 export default function BusinessSettingsScreen() {
+  const { logout } = useAuth();
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -112,7 +113,10 @@ export default function BusinessSettingsScreen() {
 
         <TouchableOpacity 
           style={styles.logoutButton}
-          onPress={() => router.replace('/login')} //
+         onPress={async () => {
+  await logout();
+  router.replace('/login');
+}} //
         >
           <Text style={styles.logoutText}>Hesaptan Çıkış Yap</Text>
         </TouchableOpacity>

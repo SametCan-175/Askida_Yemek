@@ -1,3 +1,4 @@
+import { useAuth } from '../contexts/AuthContext'; // Yol dosyaya göre değişir
 import React from 'react';
 import { 
   View, 
@@ -9,14 +10,16 @@ import {
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { logout } from '../services/auth';
 
-// Minimalist Satır Bileşeni
 const SettingRow = ({ icon, title, path, color = "#111827", isLast = false }: any) => (
-  <TouchableOpacity 
-    style={[styles.rowContainer, isLast && { borderBottomWidth: 0 }]} 
-    onPress={() => router.push(path as any)}
-    activeOpacity={0.5}
-  >
+<TouchableOpacity 
+  style={styles.logoutSection}
+  onPress={async () => {
+    await logout();
+    router.replace('/login');
+  }}
+>
     <View style={styles.rowLeft}>
       <MaterialCommunityIcons name={icon} size={22} color={color} />
       <Text style={styles.rowText}>{title}</Text>
@@ -26,6 +29,7 @@ const SettingRow = ({ icon, title, path, color = "#111827", isLast = false }: an
 );
 
 export default function SettingsScreen() {
+const { logout } = useAuth(); 
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -83,7 +87,10 @@ export default function SettingsScreen() {
         {/* Çıkış Butonu */}
         <TouchableOpacity 
           style={styles.logoutSection}
-          onPress={() => router.replace('/login')}
+          onPress={async () => {
+ // await logout();
+  router.replace('/login');
+}}
         >
           <MaterialCommunityIcons name="logout" size={20} color="#EF4444" />
           <Text style={styles.logoutText}>Oturumu Kapat</Text>

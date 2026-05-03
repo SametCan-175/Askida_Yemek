@@ -31,32 +31,63 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 
 def _to_listing_out(listing: Listing) -> ListingOut:
-    """ORM nesnesini schema'ya çevirir, varsa AI skorlarını da ekler."""
-    obj = ListingOut.model_validate(listing)
-
-    # Discount hesapla
-    if listing.original_price > 0:
-        obj.discount_percent = round(
+    """ORM nesnesini schema'ya çevirir, AI skorlarını da ekler."""
+    
+    # discount_percent hesapla
+    if listing.original_price and listing.original_price > 0:
+        discount_pct = round(
             (1 - listing.discounted_price / listing.original_price) * 100, 1
         )
     else:
-        obj.discount_percent = 0.0
+        discount_pct = 0.0
 
-    # Eğer canlı AI çağrısından gelen değerler varsa onları kullan
+    # AI skorlarını çek
+    ai_score = None
+    badge_text = None
+    ai_description = None
+
+    # Önce canlı AI çağrısından gelen değerleri kontrol et
     if hasattr(listing, "_ai_score"):
-        obj.ai_score = getattr(listing, "_ai_score", None)
-        obj.badge_text = getattr(listing, "_badge_text", None)
-        obj.ai_description = getattr(listing, "_ai_description", None)
+        ai_score = getattr(listing, "_ai_score", None)
+        badge_text = getattr(listing, "_badge_text", None)
+        ai_description = getattr(listing, "_ai_description", None)
     else:
-        # DB'de kayıtlı AI skoru varsa onu kullan
+        # DB'de cache'lenmiş AI skoru varsa onu kullan
         ai_data = listing.ai_score
         if ai_data:
-            ai_record = ai_data[0] if isinstance(ai_data, list) else ai_data
-            obj.ai_score = ai_record.ai_score
-            obj.badge_text = ai_record.badge_text
-            obj.ai_description = ai_record.ai_description
+            # ListingAiScore back_populates="ai_score" muhtemelen liste döner
+            if isinstance(ai_data, list):
+                if len(ai_data) > 0:
+                    ai_record = ai_data[0]
+                    ai_score = ai_record.ai_score
+                    badge_text = ai_record.badge_text
+                    ai_description = ai_record.ai_description
+            else:
+                # Tek nesne
+                ai_score = ai_data.ai_score
+                badge_text = ai_data.badge_text
+                ai_description = ai_data.ai_description
 
-    return obj
+    # Pydantic objeyi MANUEL olarak inşa et (model_validate yerine)
+    return ListingOut(
+        id=listing.id,
+        shop_id=listing.shop_id,
+        title=listing.title,
+        description=listing.description,
+        original_price=listing.original_price,
+        discounted_price=listing.discounted_price,
+        discount_percent=discount_pct,
+        quantity=listing.quantity,
+        pickup_start=listing.pickup_start,
+        pickup_end=listing.pickup_end,
+        image_url=listing.image_url,
+        status=listing.status,
+        created_at=listing.created_at,
+        shop=listing.shop,
+        ai_score=ai_score,
+        badge_text=badge_text,
+        ai_description=ai_description,
+    )
 
 
 @router.get("", response_model=ListingList)

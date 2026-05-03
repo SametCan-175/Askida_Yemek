@@ -15,13 +15,14 @@ Batuhan'ın çağıracağı fonksiyon:
   yanit = destek_ajani_yanit(user_id, mesaj, konusma_gecmisi)
 """
 
-import os
 import logging
+import os
 from groq import Groq
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 
-load_dotenv()
-client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+load_dotenv(find_dotenv())
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 MODEL = "llama-3.3-70b-versatile"
 APP_ADI = "Son Lokma"
 
@@ -101,6 +102,20 @@ def destek_ajani_yanit(
 
     # Yeni mesajı ekle
     mesajlar.append({"role": "user", "content": yeni_mesaj})
+
+    if client is None:
+        yanit = (
+            "Merhaba, ben Lokma. Su an Groq anahtari tanimli olmadigi icin "
+            "canli AI modunda degilim ama siparis, rezervasyon ve uygulama "
+            "kullanimi konusunda yardimci olabilirim."
+        )
+        guncellenmis_gecmis = konusma_gecmisi.copy()
+        guncellenmis_gecmis.append({"rol": "kullanici", "mesaj": yeni_mesaj})
+        guncellenmis_gecmis.append({"rol": "asistan", "mesaj": yanit})
+        return {
+            "yanit": yanit,
+            "guncellenmis_gecmis": guncellenmis_gecmis[-20:]
+        }
 
     try:
         response = client.chat.completions.create(
