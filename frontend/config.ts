@@ -1,20 +1,26 @@
+import Constants from 'expo-constants';
+
 /**
- * Backend bağlantı ayarları.
- * 
- * GELİŞTİRME (telefonda test ediyorsan):
- *   - Bilgisayarın LAN IP'sini bul (Windows: ipconfig, Mac: ifconfig)
- *   - Örnek: 192.168.1.9
- *   - BACKEND_URL'i o IP ile değiştir
- * 
- * EMÜLATÖR'DE TEST EDİYORSAN:
- *   - Android emülatör: http://10.0.2.2:8000
- *   - iOS simülatör: http://localhost:8000
+ * Geliştirme bilgisayarının IP'sini Expo'dan otomatik al.
+ * Bu sayede her geliştiricinin makinasında çalışır.
  */
+function getDevHost(): string {
+  // expoConfig.hostUri formatı: "192.168.1.6:8081"
+  const hostUri = 
+    Constants.expoConfig?.hostUri || 
+    (Constants.manifest2 as any)?.extra?.expoClient?.hostUri ||
+    (Constants.manifest as any)?.hostUri;
 
-// 🔧 BURAYI DEĞİŞTİR — telefonda test için bilgisayarının LAN IP'sini yaz
-export const BACKEND_URL = "http://192.168.1.6:8000";
+  if (hostUri && typeof hostUri === 'string') {
+    return hostUri.split(':')[0];
+  }
 
-// AI servisi (frontend doğrudan çağırmıyor, backend üzerinden gidecek)
-// Buraya gerek yok ama referans olsun
+  // Fallback (dev'de Expo IP veremezse)
+  return '127.0.0.1';
+}
 
-export const API_TIMEOUT = 15000; // 15 saniye
+const HOST = getDevHost();
+
+export const BACKEND_URL = `http://${HOST}:8000`;
+export const AI_URL = `http://${HOST}:5000`;
+export const API_TIMEOUT = 15000;

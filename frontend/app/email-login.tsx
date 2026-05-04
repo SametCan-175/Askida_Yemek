@@ -52,8 +52,12 @@ export default function EmailLoginScreen() {
         }
       } else {
         // Mevcut kullanıcı girişi
-        await login(email.trim().toLowerCase(), password);
-        router.replace('/(tabs)');
+      const loggedUser = await login(email, password);
+        if (loggedUser.role === 'business') {
+          router.replace('/business/business-dashboard');
+        } else {
+          router.replace('/(tabs)');
+        }
       }
     } catch (error: any) {
       Alert.alert(

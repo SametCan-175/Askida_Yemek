@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -7,43 +7,101 @@ import {
   SafeAreaView, 
   ScrollView,
   Alert,
-  Modal
+  Modal,
+  ActivityIndicator,
+  RefreshControl
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 
-// Başlangıç Stok Verisi
-const INITIAL_STOCK = [
-  { id: '1', title: 'Sürpriz Paket (Standart)', count: 5, price: '50.00₺' },
-  { id: '2', title: 'Unlu Mamul Paketi', count: 2, price: '40.00₺' },
-];
-
-const RECENT_ORDERS = [
-  { id: '101', customer: 'Ahmet H.', time: '18:45', status: 'Teslim Edildi' },
-  { id: '102', customer: 'Ayşe K.', time: '18:20', status: 'Teslim Edildi' },
-];
+import { useAuth } from '../../contexts/AuthContext';
+import { 
+  fetchMyShop, 
+  fetchShopListings, 
+  fetchShopReservations, 
+  updateReservationStatus,
+  Shop 
+} from '../../services/business';
+import { Listing } from '../../services/listings';
+import { Reservation } from '../../services/reservations';
 
 export default function BusinessDashboard() {
-  const [stocks, setStocks] = useState(INITIAL_STOCK);
+  const { user } = useAuth();
+
+  const [shop, setShop] = useState<Shop | null>(null);
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   
-  // Kamera State'leri
   const [permission, requestPermission] = useCameraPermissions();
   const [isCameraVisible, setIsCameraVisible] = useState(false);
+  const [isProcessingScan, setIsProcessingScan] = useState(false);
 
-  // Stok Arttırma Fonksiyonu
-  const increaseStock = (id: string) => {
-    setStocks(stocks.map(item => item.id === id ? { ...item, count: item.count + 1 } : item));
+  const loadData = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      // Mağaza bilgisini bul
+      const myShop = await fetchMyShop(user.id);
+      setShop(myShop);
+
+      // Paralel olarak listing'ler ve rezervasyonlar
+      const [shopListings, shopReservations] = await Promise.all([
+        myShop ? fetchShopListings(myShop.id) : Promise.resolve([]),
+        fetchShopReservations(),
+      ]);
+
+      setListings(shopListings);
+      setReservations(shopReservations);
+    } catch (err: any) {
+      console.error('Dashboard yüklenemedi:', err);
+      Alert.alert('Hata', err.message || 'Veriler yüklenirken bir sorun oluştu.');
+    } finally {
+      setIsLoading(false);
+      setRefreshing(false);
+    }
+  }, [user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadData();
   };
 
-  // Stok Azaltma Fonksiyonu
-  const decreaseStock = (id: string) => {
-    setStocks(stocks.map(item => 
-      item.id === id && item.count > 0 ? { ...item, count: item.count - 1 } : item
-    ));
-  };
+  // Bugünün teslim edilen siparişlerinden günlük kazanç hesapla
+  const dailyEarnings = (() => {
+    const today = new Date().toDateString();
+    const todayPickedUp = reservations.filter(r => {
+      const isToday = new Date(r.created_at).toDateString() === today;
+      const isPickedUp = r.status === 'picked_up';
+      return isToday && isPickedUp;
+    });
 
-  // QR Tarama Butonuna Basıldığında
+    return todayPickedUp.reduce((sum, r) => {
+      const listing = listings.find(l => l.id === r.listing_id);
+      return sum + (listing ? listing.discounted_price * r.quantity : 0);
+    }, 0);
+  })();
+
+  // Aktif stok toplamı
+  const totalStock = listings
+    .filter(l => l.status === 'active')
+    .reduce((sum, l) => sum + l.quantity, 0);
+
+  // Bugünkü teslimatlar
+  const todayDeliveries = reservations.filter(r => {
+    const today = new Date().toDateString();
+    return new Date(r.created_at).toDateString() === today;
+  });
+
+  // QR Tarama
   const handleOpenScanner = async () => {
     if (!permission?.granted) {
       const { granted } = await requestPermission();
@@ -55,40 +113,72 @@ export default function BusinessDashboard() {
     setIsCameraVisible(true);
   };
 
-  // GÜNCELLENEN KISIM: Kamera Bir QR Kod Okuduğunda Gerçek API Çağrısı Yapar
-  const handleBarCodeScanned = async ({ type, data }: { type: string, data: string }) => {
-    setIsCameraVisible(false); // Kamerayı hemen kapat
+  const handleBarCodeScanned = async ({ data }: { type: string, data: string }) => {
+    if (isProcessingScan) return;
+    setIsProcessingScan(true);
+    setIsCameraVisible(false);
 
     try {
-      // Backend Dokümantasyonu: PATCH /reservations/{id}/status
-      // 'data' değişkeni QR'dan gelen Rezervasyon ID'sidir
-      const response = await fetch(`https://api.seninsiten.com/reservations/${data}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          // Doküman auth:true diyor, buraya giriş yapan işletmenin token'ı gelmeli
-          'Authorization': `Bearer BURAYA_ISLETME_TOKENI_GELECEK` 
-        },
-        body: JSON.stringify({ 
-          status: 'picked_up' // Teslim edildi statüsü
-        })
-      });
-
-      if (response.ok) {
-        Alert.alert(
-          'Sipariş Teslim Edildi! 🎉', 
-          `Sipariş No: ${data} başarıyla onaylandı. Stok güncellendi.`,
-          [{ text: 'Harika!' }]
-        );
-        // Burada istersen sipariş listesini yenileyecek bir fonksiyon çağırabilirsin
+      // QR kod ya direkt rezervasyon ID'si ya da "SL-000123" gibi formatlanmış olabilir
+      let reservationId: number;
+      if (data.startsWith('SL-')) {
+        reservationId = parseInt(data.replace('SL-', ''));
       } else {
-        Alert.alert('Hata', 'Geçersiz veya süresi dolmuş QR kod!');
+        reservationId = parseInt(data);
       }
-    } catch (error) {
+
+      if (isNaN(reservationId)) {
+        Alert.alert('Geçersiz QR', 'Bu QR kod tanımlanamadı.');
+        return;
+      }
+
+      await updateReservationStatus(reservationId, 'picked_up');
+      Alert.alert(
+        '✅ Sipariş Teslim Edildi!', 
+        `Sipariş #${reservationId} başarıyla onaylandı.`,
+        [{ text: 'Harika!', onPress: () => loadData() }]
+      );
+    } catch (error: any) {
       console.error("Teslimat API Hatası:", error);
-      Alert.alert('Bağlantı Hatası', 'Sunucuya ulaşılamadı.');
+      Alert.alert(
+        'Hata', 
+        error.message?.includes('404') 
+          ? 'Bu rezervasyon bulunamadı.' 
+          : 'Teslimat onaylanamadı, tekrar dene.'
+      );
+    } finally {
+      setIsProcessingScan(false);
     }
   };
+
+  // Status'ten Türkçe etiket
+  const statusLabel = (status: string) => {
+    switch (status) {
+      case 'pending': return 'Bekliyor';
+      case 'confirmed': return 'Onaylandı';
+      case 'picked_up': return 'Teslim Edildi';
+      case 'cancelled': return 'İptal';
+      default: return status;
+    }
+  };
+
+  const statusColor = (status: string) => {
+    switch (status) {
+      case 'picked_up': return '#10B981';
+      case 'confirmed': return '#3B82F6';
+      case 'cancelled': return '#EF4444';
+      default: return '#F59E0B';
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#0A4D44" />
+        <Text style={{ marginTop: 12, color: '#6B7280' }}>İşletme verileri yükleniyor...</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -99,32 +189,32 @@ export default function BusinessDashboard() {
         </View>
         <View style={{ flex: 1, marginLeft: 12 }}>
           <Text style={styles.welcomeText}>Hoş Geldin,</Text>
-          <Text style={styles.headerName}>Ahmet Hakan</Text>
+          <Text style={styles.headerName}>{shop?.name || user?.full_name || 'İşletme'}</Text>
         </View>
         <TouchableOpacity style={styles.settingsBtn} onPress={() => router.push('/business/business-settings')}>
           <Ionicons name="settings-outline" size={26} color="#0A4D44" />
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0A4D44']} />}
+      >
         {/* Özet Kartları */}
         <View style={styles.statsRow}>
           <View style={styles.card}>
-            <Text style={styles.statLabel}>Kalan Paket</Text>
-            <Text style={styles.statValue}>{stocks.reduce((acc, curr) => acc + curr.count, 0)}</Text>
+            <Text style={styles.statLabel}>Aktif Stok</Text>
+            <Text style={styles.statValue}>{totalStock}</Text>
           </View>
           
-          <TouchableOpacity 
-            style={styles.card} 
-            activeOpacity={0.8}
-            onPress={() => router.push('/business/wallet')}
-          >
-            <Text style={styles.statLabel}>Günlük Kazanç</Text>
-            <Text style={[styles.statValue, { color: '#10B981' }]}>330.00₺</Text>
-          </TouchableOpacity>
+          <View style={styles.card}>
+            <Text style={styles.statLabel}>Bugünkü Kazanç</Text>
+            <Text style={[styles.statValue, { color: '#10B981' }]}>{dailyEarnings.toFixed(0)}₺</Text>
+          </View>
         </View>
 
-        {/* ANA AKSİYON: QR OKUTMA */}
+        {/* QR OKUTMA */}
         <TouchableOpacity 
           style={styles.qrCard}
           activeOpacity={0.8}
@@ -141,7 +231,7 @@ export default function BusinessDashboard() {
           </View>
         </TouchableOpacity>
 
-        {/* Stok Yönetimi */}
+        {/* Aktif Stoklar */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Aktif Stoklar</Text>
           <TouchableOpacity onPress={() => router.push('/business/add-product')}>
@@ -150,54 +240,74 @@ export default function BusinessDashboard() {
         </View>
 
         <View style={styles.cardsContainer}>
-          {stocks.map((item) => (
-            <View key={item.id} style={styles.stockItemCard}>
-              <View style={styles.stockInfo}>
-                <Text style={styles.storeName}>{item.title}</Text>
-                <Text style={styles.productDesc}>Birim Fiyat: {item.price}</Text>
-              </View>
-              
-              <View style={styles.counterContainer}>
-                <TouchableOpacity 
-                  style={[styles.counterBtn, item.count === 0 && styles.counterBtnDisabled]} 
-                  onPress={() => decreaseStock(item.id)}
-                  disabled={item.count === 0}
-                >
-                  <Ionicons name="remove" size={20} color={item.count === 0 ? "#9CA3AF" : "#111827"} />
-                </TouchableOpacity>
-                <Text style={styles.countText}>{item.count}</Text>
-                <TouchableOpacity 
-                  style={styles.counterBtn} 
-                  onPress={() => increaseStock(item.id)}
-                >
-                  <Ionicons name="add" size={20} color="#111827" />
-                </TouchableOpacity>
-              </View>
+          {listings.length === 0 ? (
+            <View style={styles.emptyBox}>
+              <MaterialCommunityIcons name="package-variant-closed" size={50} color="#A7D1C6" />
+              <Text style={styles.emptyText}>Henüz aktif ilan yok.</Text>
+              <Text style={styles.emptyHelper}>"+ Yeni Ekle" ile sürpriz paket oluştur.</Text>
             </View>
-          ))}
+          ) : (
+            listings.map((item) => (
+              <View key={item.id} style={styles.stockItemCard}>
+                <View style={styles.stockInfo}>
+                  <Text style={styles.storeName}>{item.title}</Text>
+                  <Text style={styles.productDesc}>
+                    Birim: {item.discounted_price.toFixed(2)}₺ · Kalan: {item.quantity}
+                  </Text>
+                </View>
+                <View style={styles.statusBadge}>
+                  <View style={[styles.statusDot, { backgroundColor: item.status === 'active' ? '#10B981' : '#9CA3AF' }]} />
+                  <Text style={styles.statusBadgeText}>
+                    {item.status === 'active' ? 'Aktif' : 'Pasif'}
+                  </Text>
+                </View>
+              </View>
+            ))
+          )}
         </View>
 
-        {/* Son İşlemler */}
+        {/* Bugünkü Teslimatlar */}
         <View style={[styles.sectionHeader, { marginTop: 30 }]}>
-          <Text style={styles.sectionTitle}>Bugünkü Teslimatlar</Text>
+          <Text style={styles.sectionTitle}>Bugünkü Siparişler</Text>
+          <Text style={styles.countText}>{todayDeliveries.length} adet</Text>
         </View>
         <View style={styles.cardsContainer}>
-          {RECENT_ORDERS.map((order) => (
-            <View key={order.id} style={styles.orderRow}>
-              <Ionicons name="checkmark-circle" size={28} color="#10B981" />
-              <View style={styles.orderInfo}>
-                <Text style={styles.storeName}>{order.customer}</Text>
-                <Text style={styles.timeDistanceText}>{order.time}</Text>
-              </View>
-              <Text style={styles.orderStatus}>{order.status}</Text>
+          {todayDeliveries.length === 0 ? (
+            <View style={styles.emptyBox}>
+              <Ionicons name="receipt-outline" size={50} color="#A7D1C6" />
+              <Text style={styles.emptyText}>Bugün henüz sipariş yok.</Text>
             </View>
-          ))}
+          ) : (
+            todayDeliveries.map((order) => {
+              const listing = listings.find(l => l.id === order.listing_id);
+              return (
+                <View key={order.id} style={styles.orderRow}>
+                  <Ionicons 
+                    name={order.status === 'picked_up' ? 'checkmark-circle' : 'time'} 
+                    size={28} 
+                    color={statusColor(order.status)} 
+                  />
+                  <View style={styles.orderInfo}>
+                    <Text style={styles.storeName}>
+                      Sipariş #{order.id} · {order.quantity} adet
+                    </Text>
+                    <Text style={styles.timeDistanceText}>
+                      {listing?.title || 'İlan silinmiş'} · {new Date(order.created_at).toLocaleTimeString('tr-TR', {hour: '2-digit', minute: '2-digit'})}
+                    </Text>
+                  </View>
+                  <Text style={[styles.orderStatus, { color: statusColor(order.status) }]}>
+                    {statusLabel(order.status)}
+                  </Text>
+                </View>
+              );
+            })
+          )}
         </View>
 
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* QR OKUYUCU MODALI */}
+      {/* QR OKUYUCU MODAL */}
       <Modal visible={isCameraVisible} animationType="slide" transparent={false}>
         <View style={styles.cameraContainer}>
           <View style={styles.cameraHeader}>
@@ -210,7 +320,7 @@ export default function BusinessDashboard() {
           <CameraView 
             style={StyleSheet.absoluteFillObject}
             facing="back"
-            onBarcodeScanned={handleBarCodeScanned}
+            onBarcodeScanned={isProcessingScan ? undefined : handleBarCodeScanned}
             barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
           />
           
@@ -232,10 +342,10 @@ const styles = StyleSheet.create({
   settingsBtn: { padding: 5 },
   scrollContent: { padding: 16 },
   statsRow: { flexDirection: 'row', gap: 15, marginBottom: 20 },
-  card: { flex: 1, backgroundColor: '#FFFFFF', padding: 20, borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4, borderWidth: 1, borderColor: '#F3F4F6' },
+  card: { flex: 1, backgroundColor: '#FFFFFF', padding: 20, borderRadius: 16, elevation: 4, borderWidth: 1, borderColor: '#F3F4F6' },
   statLabel: { fontSize: 13, color: '#6B7280', marginBottom: 8, fontWeight: '600' },
   statValue: { fontSize: 24, fontWeight: '900', color: '#111827' },
-  qrCard: { backgroundColor: '#0A4D44', borderRadius: 20, overflow: 'hidden', marginBottom: 25, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 5 },
+  qrCard: { backgroundColor: '#0A4D44', borderRadius: 20, overflow: 'hidden', marginBottom: 25, elevation: 5 },
   qrContent: { flexDirection: 'row', padding: 20, alignItems: 'center' },
   qrTextContent: { flex: 1, paddingRight: 10 },
   qrTitle: { fontSize: 18, fontWeight: '800', color: '#FFFFFF', marginBottom: 8 },
@@ -244,19 +354,22 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   sectionTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
   seeAllText: { fontSize: 15, fontWeight: '700', color: '#0A4D44' },
+  countText: { fontSize: 13, color: '#6B7280', fontWeight: '600' },
   cardsContainer: { gap: 12 },
-  stockItemCard: { flexDirection: 'row', backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 3, borderWidth: 1, borderColor: '#F3F4F6' },
+  emptyBox: { backgroundColor: '#FFFFFF', padding: 30, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#F3F4F6' },
+  emptyText: { marginTop: 12, fontSize: 15, fontWeight: '700', color: '#0A4D44' },
+  emptyHelper: { marginTop: 4, fontSize: 13, color: '#6B7280' },
+  stockItemCard: { flexDirection: 'row', backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: '#F3F4F6' },
   stockInfo: { flex: 1 },
   storeName: { fontSize: 16, fontWeight: '800', color: '#111827', marginBottom: 4 },
-  productDesc: { fontSize: 14, color: '#6B7280' },
-  counterContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', borderRadius: 20, padding: 4 },
-  counterBtn: { width: 36, height: 36, backgroundColor: '#FFFFFF', borderRadius: 18, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
-  counterBtnDisabled: { backgroundColor: '#E5E7EB', shadowOpacity: 0, elevation: 0 },
-  countText: { paddingHorizontal: 16, fontSize: 16, fontWeight: '800', color: '#111827' },
-  orderRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', padding: 16, borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2, borderWidth: 1, borderColor: '#F3F4F6' },
+  productDesc: { fontSize: 13, color: '#6B7280' },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F0F9F6', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  statusBadgeText: { fontSize: 12, fontWeight: '700', color: '#0A4D44' },
+  orderRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#F3F4F6' },
   orderInfo: { flex: 1, marginLeft: 12 },
   timeDistanceText: { fontSize: 13, color: '#6B7280', marginTop: 2 },
-  orderStatus: { fontSize: 14, color: '#10B981', fontWeight: '700' },
+  orderStatus: { fontSize: 13, fontWeight: '800' },
   cameraContainer: { flex: 1, backgroundColor: '#000' },
   cameraHeader: { position: 'absolute', top: 50, left: 20, right: 20, zIndex: 10, flexDirection: 'row', alignItems: 'center' },
   closeCameraBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },

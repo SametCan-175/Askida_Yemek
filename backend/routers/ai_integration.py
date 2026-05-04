@@ -2,11 +2,16 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
+import os
+import requests
 
 from database import get_db
 from models import Listing, ListingAiScore, Reservation, ReservationStatus, User
 
 router = APIRouter()
+
+# AI servisinin URL'i (.env'den okur, yoksa localhost:5000)
+AI_URL = os.environ.get("AI_URL", "http://127.0.0.1:5000")
 
 
 # ─── Şemalar ──────────────────────────────────────────────────────────────────
@@ -123,23 +128,9 @@ def canli_destek(
     db: Session = Depends(get_db),
 ):
     """
-    Canlı destek endpoint'i. Lokma (AI) bu endpoint'ten veriyi alır.
-
-    Backend otomatik olarak kullanıcının sipariş geçmişini çekip
-    siparis_gecmisi alanında döner. Lokma bu veriyi görerek
-    "Son siparişin X kafeden Y ürünüydü" gibi gerçek yanıtlar verebilir.
-
-    Dönen format:
-    {
-        "user_id": 1,
-        "kullanici_adi": "Ali",
-        "mesaj": "Son siparişim ne?",
-        "konusma_gecmisi": [...],
-        "siparis_gecmisi": [
-            {"urun": "Ekmek Sepeti", "kafe": "Ayşe'nin Fırını",
-             "tarih": "2026-04-27", "fiyat": 25, "durum": "picked_up"}
-        ]
-    }
+    Canlı destek endpoint'i. Backend kullanıcının sipariş geçmişini DB'den
+    çeker, mesajın başına ekleyip AI servisine (Lokma) yollar.
+    AI'nın cevabını döner.
     """
     user = db.query(User).filter(User.id == payload.user_id).first()
     if not user:
@@ -162,17 +153,60 @@ def canli_destek(
             "urun": r.listing.title if r.listing else None,
             "kafe": r.listing.shop.name if r.listing and r.listing.shop else None,
             "tarih": r.created_at.strftime("%Y-%m-%d"),
-            "fiyat": r.listing.discounted_price if r.listing else None,
-            "durum": r.status,
+            "fiyat": float(r.listing.discounted_price) if r.listing else None,
+            "durum": r.status.value if hasattr(r.status, "value") else str(r.status),
             "adet": r.quantity,
         }
         for r in son_siparisler
     ]
 
-    return {
-        "user_id": payload.user_id,
-        "kullanici_adi": user.full_name,
-        "mesaj": payload.mesaj,
-        "konusma_gecmisi": payload.konusma_gecmisi,
-        "siparis_gecmisi": siparis_gecmisi,
-    }
+    # Sipariş geçmişini insan-okunur metne çevir, mesajın başına context olarak ekle
+    if siparis_gecmisi:
+        siparis_satirlari = []
+        for s in siparis_gecmisi[:5]:  # Son 5 sipariş yeter
+            satir = (
+                f"- {s['tarih']}: {s['kafe']}'den {s['urun']} "
+                f"({s['adet']} adet, {s['fiyat']}₺, durum: {s['durum']})"
+            )
+            siparis_satirlari.append(satir)
+        siparis_metni = "\n".join(siparis_satirlari)
+        zenginlestirilmis_mesaj = (
+            f"[Sistem bilgisi: Kullanıcının adı '{user.full_name}'. "
+            f"Son siparişleri:\n{siparis_metni}\n"
+            f"Bu bilgileri kullanarak yanıt ver.]\n\n"
+            f"Kullanıcı sorusu: {payload.mesaj}"
+        )
+    else:
+        zenginlestirilmis_mesaj = (
+            f"[Sistem bilgisi: Kullanıcının adı '{user.full_name}'. "
+            f"Henüz hiç siparişi yok.]\n\n"
+            f"Kullanıcı sorusu: {payload.mesaj}"
+        )
+
+    # AI servisine (port 5000) istek at
+    try:
+        ai_response = requests.post(
+            f"{AI_URL}/support",
+            json={
+                "user_id": payload.user_id,
+                "mesaj": zenginlestirilmis_mesaj,
+                "konusma_gecmisi": payload.konusma_gecmisi,
+            },
+            timeout=15,
+        )
+        ai_response.raise_for_status()
+        ai_data = ai_response.json()
+
+        # AI'nın cevabını dön + DB'den çekilen sipariş geçmişini de dahil et (debug için)
+        return {
+            "yanit": ai_data.get("yanit", "Cevap üretilemedi."),
+            "guncellenmis_gecmis": ai_data.get("guncellenmis_gecmis", []),
+            "siparis_gecmisi": siparis_gecmisi,  # Frontend isterse görsün
+        }
+
+    except requests.exceptions.Timeout:
+        raise HTTPException(status_code=504, detail="AI servisi yanıt vermedi.")
+    except requests.exceptions.ConnectionError:
+        raise HTTPException(status_code=503, detail="AI servisi şu an erişilemez.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI çağrısı hatası: {str(e)}")

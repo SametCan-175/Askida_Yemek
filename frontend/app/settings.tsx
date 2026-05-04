@@ -1,4 +1,3 @@
-import { useAuth } from '../contexts/AuthContext'; // Yol dosyaya göre değişir
 import React from 'react';
 import { 
   View, 
@@ -10,16 +9,14 @@ import {
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { logout } from '../services/auth';
+import { useAuth } from '../contexts/AuthContext';
 
 const SettingRow = ({ icon, title, path, color = "#111827", isLast = false }: any) => (
-<TouchableOpacity 
-  style={styles.logoutSection}
-  onPress={async () => {
-    await logout();
-    router.replace('/login');
-  }}
->
+  <TouchableOpacity 
+    style={[styles.rowContainer, isLast && { borderBottomWidth: 0 }]}
+    onPress={() => router.push(path)}
+    activeOpacity={0.7}
+  >
     <View style={styles.rowLeft}>
       <MaterialCommunityIcons name={icon} size={22} color={color} />
       <Text style={styles.rowText}>{title}</Text>
@@ -29,7 +26,17 @@ const SettingRow = ({ icon, title, path, color = "#111827", isLast = false }: an
 );
 
 export default function SettingsScreen() {
-const { logout } = useAuth(); 
+  const { user, logout } = useAuth();
+
+  // Kullanıcı adından harf ve görünen isim üret
+  const displayName = user?.full_name || 'Kullanıcı';
+  const avatarLetter = displayName.charAt(0).toUpperCase();
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/login');
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -46,10 +53,10 @@ const { logout } = useAuth();
         {/* Profil Alanı */}
         <View style={styles.profileHeader}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarLetter}>B</Text>
+            <Text style={styles.avatarLetter}>{avatarLetter}</Text>
           </View>
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>Berkay</Text>
+            <Text style={styles.profileName}>{displayName}</Text>
             <TouchableOpacity onPress={() => router.push('/settings/account-details')}>
               <Text style={styles.editProfileText}>Profilini Düzenle</Text>
             </TouchableOpacity>
@@ -71,13 +78,13 @@ const { logout } = useAuth();
             <SettingRow icon="bell-outline" title="Bildirim Ayarları" path="/settings/notifications" />
             <SettingRow icon="credit-card-outline" title="Ödeme Yöntemleri" path="/settings/payments" />
             <SettingRow icon="ticket-percent-outline" title="Kuponlarım" path="/settings/vouchers" />
-            <SettingRow icon="heart-outline" title="Favori İşletmeler" path="/settings/favorites" />
+            <SettingRow icon="heart-outline" title="Favori İşletmeler" path="/(tabs)/favorites" />
             <SettingRow icon="earth" title="Dil Seçeneği" path="/settings/language" isLast={true} />
           </View>
 
           <Text style={styles.sectionLabel}>DESTEK VE YASAL</Text>
           <View style={styles.sectionCard}>
-            <SettingRow icon="help-circle-outline" title="Yardım Merkezi" path="/settings/support" />
+            <SettingRow icon="help-circle-outline" title="Yardım Merkezi" path="/support" />
             <SettingRow icon="message-text-outline" title="Bize Ulaşın" path="/settings/contact-us" />
             <SettingRow icon="file-document-outline" title="Kullanım Koşulları" path="/settings/terms" />
             <SettingRow icon="eye-outline" title="Gizlilik Politikası" path="/settings/privacy" isLast={true} />
@@ -87,10 +94,8 @@ const { logout } = useAuth();
         {/* Çıkış Butonu */}
         <TouchableOpacity 
           style={styles.logoutSection}
-          onPress={async () => {
- // await logout();
-  router.replace('/login');
-}}
+          onPress={handleLogout}
+          activeOpacity={0.7}
         >
           <MaterialCommunityIcons name="logout" size={20} color="#EF4444" />
           <Text style={styles.logoutText}>Oturumu Kapat</Text>
@@ -103,7 +108,7 @@ const { logout } = useAuth();
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' }, // Hafif gri arka plan (kartları belli eder)
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
   header: { 
     flexDirection: 'row', 
     alignItems: 'center', 

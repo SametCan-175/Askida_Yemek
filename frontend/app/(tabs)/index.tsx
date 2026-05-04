@@ -58,7 +58,7 @@ export default function Index() {
       if (userLocation) {
         filters.lat = userLocation.lat;
         filters.lon = userLocation.lon;
-        filters.radius = 20;
+        filters.radius = 10;
         if (user) filters.user_id = user.id;
       }
 

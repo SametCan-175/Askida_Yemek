@@ -10,75 +10,88 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Keyboard,
-  Image
+  Keyboard
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useLocalSearchParams, router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 
-// GÜNCELLENEN KISIM: Backend'in (Yapay Zekanın) anladığı format
+import { useAuth } from '../contexts/AuthContext';
+import { sendSupportMessage, ChatMessage } from '../services/support';
+
 type Message = {
   id: string;
-  content: string; // text yerine content
-  role: 'user' | 'agent'; // sender yerine role
+  content: string;
+  role: 'user' | 'agent';
 };
 
 export default function SupportScreen() {
-  // GÜNCELLENEN KISIM: Profile sayfasından gelen user_id'yi yakalıyoruz
-  const { user_id } = useLocalSearchParams();
+  const { user } = useAuth();
 
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  // GÜNCELLENEN KISIM: Başlangıç mesajının formatı uyarlandı
   const [messages, setMessages] = useState<Message[]>([
-    { id: '1', content: 'Merhaba! Ben Lokmacık, senin akıllı asistanın. Siparişlerin veya uygulamayla ilgili sana nasıl yardımcı olabilirim? 😊', role: 'agent' }
+    { 
+      id: '1', 
+      content: 'Merhaba! Ben Lokma, Son Lokma\'nın akıllı asistanı. Siparişlerin, rezervasyonların veya uygulamayla ilgili sana nasıl yardımcı olabilirim? 😊', 
+      role: 'agent' 
+    }
   ]);
 
   const flatListRef = useRef<FlatList>(null);
 
-  const handleSend = async () => {
-    if (!inputText.trim()) return;
+  // Frontend formatından backend formatına çevir
+  const toBackendHistory = (msgs: Message[]): ChatMessage[] => {
+    return msgs
+      .slice(1) // İlk karşılama mesajını atla
+      .map(m => ({
+        rol: m.role === 'user' ? 'kullanici' as const : 'asistan' as const,
+        mesaj: m.content,
+      }));
+  };
 
-    // Kullanıcının yazdığını objeye çevir
-    const userMessage: Message = { id: Date.now().toString(), content: inputText.trim(), role: 'user' };
+  const handleSend = async () => {
+    const trimmed = inputText.trim();
+    if (!trimmed || isLoading) return;
+
+    if (!user) {
+      alert('Önce giriş yapmalısın.');
+      return;
+    }
+
+    const userMessage: Message = { 
+      id: Date.now().toString(), 
+      content: trimmed, 
+      role: 'user' 
+    };
     
-    // GÜNCELLENEN KISIM: Mevcut mesajların üstüne yeni mesajı ekle (Geçmiş - History)
-    const updatedHistory = [...messages, userMessage];
-    
-    setMessages(updatedHistory);
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
     setInputText('');
     setIsLoading(true);
     Keyboard.dismiss();
 
     try {
-      const response = await fetch('https://api.seninsiten.com/ai/destek', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        
-        body: JSON.stringify({ 
-          user_id: user_id, 
-          history: updatedHistory 
-        }), 
-      });
+      // Backend'e gönderilecek geçmiş — sadece eski mesajlar (yeni mesaj zaten parametrede)
+      const history = toBackendHistory(messages);
+      
+      const data = await sendSupportMessage(user.id, trimmed, history);
+      const aiReply = data.yanit || 'Cevap alınamadı.';
 
-      const data = await response.json();
-
-      // AI'dan gelen cevabı ekrana ekle
       const aiMessage: Message = { 
         id: (Date.now() + 1).toString(), 
-        content: data.reply || data.message || "Mesajın alındı, ancak API yanıt formatı eşleşmedi.", 
+        content: aiReply,
         role: 'agent' 
       };
       setMessages(prev => [...prev, aiMessage]);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Chat API Hatası:", error);
       const errorMessage: Message = { 
         id: (Date.now() + 1).toString(), 
-        content: "Şu anda sunucularımıza ulaşamıyoruz. Backend tarafı aktif olmayabilir.", 
+        content: error.message?.includes('500') 
+          ? 'AI servisine ulaşamıyorum. Birkaç saniye sonra tekrar dene.' 
+          : (error.message || 'Bir hata oluştu, lütfen tekrar dene.'),
         role: 'agent' 
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -88,20 +101,17 @@ export default function SupportScreen() {
   };
 
   const renderMessage = ({ item }: { item: Message }) => {
-    const isUser = item.role === 'user'; // sender yerine role kontrolü
+    const isUser = item.role === 'user';
     return (
       <View style={[styles.messageWrapper, isUser ? styles.messageWrapperUser : styles.messageWrapperAI]}>
         {!isUser && (
           <View style={styles.aiAvatar}>
-            <Image 
-              source={require('../assets/lokmacik.png')}
-              style={styles.lokmacikImage}
-            />
+            <Text style={styles.aiAvatarEmoji}>🤖</Text>
           </View>
         )}
         <View style={[styles.messageBubble, isUser ? styles.userBubble : styles.aiBubble]}>
           <Text style={[styles.messageText, isUser ? styles.userText : styles.aiText]}>
-            {item.content} {/* text yerine content */}
+            {item.content}
           </Text>
         </View>
       </View>
@@ -113,6 +123,7 @@ export default function SupportScreen() {
       <KeyboardAvoidingView 
         style={{ flex: 1 }} 
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
@@ -120,7 +131,10 @@ export default function SupportScreen() {
           </TouchableOpacity>
           <View style={styles.headerTitleContainer}>
             <Text style={styles.headerTitle}>Canlı Destek</Text>
-            <Text style={styles.headerSubtitle}>Lokmacık</Text>
+            <View style={styles.statusRow}>
+              <View style={styles.onlineDot} />
+              <Text style={styles.headerSubtitle}>Lokma — Çevrimiçi</Text>
+            </View>
           </View>
           <View style={{ width: 36 }} />
         </View>
@@ -139,7 +153,7 @@ export default function SupportScreen() {
         {isLoading && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="small" color="#0A4D44" />
-            <Text style={styles.loadingText}>Asistan yanıtlıyor...</Text>
+            <Text style={styles.loadingText}>Lokma yazıyor...</Text>
           </View>
         )}
 
@@ -151,10 +165,11 @@ export default function SupportScreen() {
             value={inputText}
             onChangeText={setInputText}
             multiline
-            maxLength={200}
+            maxLength={500}
+            editable={!isLoading}
           />
           <TouchableOpacity 
-            style={[styles.sendBtn, !inputText.trim() && styles.sendBtnDisabled]} 
+            style={[styles.sendBtn, (!inputText.trim() || isLoading) && styles.sendBtnDisabled]} 
             onPress={handleSend}
             disabled={!inputText.trim() || isLoading}
           >
@@ -169,11 +184,24 @@ export default function SupportScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 15, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F3F4F6', elevation: 2, zIndex: 10 },
+  header: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    paddingHorizontal: 20, 
+    paddingVertical: 15, 
+    backgroundColor: '#FFFFFF', 
+    borderBottomWidth: 1, 
+    borderBottomColor: '#F3F4F6', 
+    elevation: 2, 
+    zIndex: 10 
+  },
   backBtn: { padding: 5, marginLeft: -5 },
   headerTitleContainer: { alignItems: 'center' },
   headerTitle: { fontSize: 18, fontWeight: '800', color: '#111827' },
-  headerSubtitle: { fontSize: 13, color: '#0A4D44', fontWeight: '800', marginTop: 2 },
+  statusRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 6 },
+  onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' },
+  headerSubtitle: { fontSize: 12, color: '#6B7280', fontWeight: '600' },
   
   chatList: { padding: 20, paddingBottom: 10 },
   
@@ -181,12 +209,17 @@ const styles = StyleSheet.create({
   messageWrapperUser: { justifyContent: 'flex-end' },
   messageWrapperAI: { justifyContent: 'flex-start' },
   
-  aiAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#0A4D44', justifyContent: 'center', alignItems: 'center', marginRight: 8, marginBottom: 5, overflow: 'hidden' },
-  lokmacikImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover' // Resmi yuvarlağın içine tam oturtur
+  aiAvatar: { 
+    width: 36, 
+    height: 36, 
+    borderRadius: 18, 
+    backgroundColor: '#0A4D44', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    marginRight: 8, 
+    marginBottom: 5 
   },
+  aiAvatarEmoji: { fontSize: 18 },
   
   messageBubble: { maxWidth: '80%', padding: 15, borderRadius: 20 },
   userBubble: { backgroundColor: '#0A4D44', borderBottomRightRadius: 5 },
@@ -199,8 +232,33 @@ const styles = StyleSheet.create({
   loadingContainer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 10 },
   loadingText: { marginLeft: 10, fontSize: 13, color: '#6B7280', fontStyle: 'italic' },
 
-  inputContainer: { flexDirection: 'row', alignItems: 'flex-end', padding: 15, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#F3F4F6' },
-  textInput: { flex: 1, backgroundColor: '#F3F4F6', borderRadius: 20, minHeight: 45, maxHeight: 100, paddingHorizontal: 20, paddingVertical: 12, fontSize: 15, color: '#111827', marginRight: 10 },
-  sendBtn: { width: 45, height: 45, borderRadius: 22.5, backgroundColor: '#10B981', justifyContent: 'center', alignItems: 'center' },
+  inputContainer: { 
+    flexDirection: 'row', 
+    alignItems: 'flex-end', 
+    padding: 15, 
+    backgroundColor: '#FFFFFF', 
+    borderTopWidth: 1, 
+    borderTopColor: '#F3F4F6' 
+  },
+  textInput: { 
+    flex: 1, 
+    backgroundColor: '#F3F4F6', 
+    borderRadius: 20, 
+    minHeight: 45, 
+    maxHeight: 100, 
+    paddingHorizontal: 20, 
+    paddingVertical: 12, 
+    fontSize: 15, 
+    color: '#111827', 
+    marginRight: 10 
+  },
+  sendBtn: { 
+    width: 45, 
+    height: 45, 
+    borderRadius: 22.5, 
+    backgroundColor: '#10B981', 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
   sendBtnDisabled: { backgroundColor: '#D1D5DB' }
 });

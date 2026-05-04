@@ -3,7 +3,7 @@ import { View, ActivityIndicator } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function Index() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
 
   // Token kontrolü yapılırken loading göster
   if (isLoading) {
@@ -14,6 +14,15 @@ export default function Index() {
     );
   }
 
-  // Giriş yapılmışsa ana sayfaya, yapılmamışsa login'e
-  return <Redirect href={isAuthenticated ? '/(tabs)' : '/login'} />;
+  // Giriş yapılmamışsa login'e
+  if (!isAuthenticated || !user) {
+    return <Redirect href="/login" />;
+  }
+
+  // Rol bazlı yönlendirme
+  if (user.role === 'business') {
+    return <Redirect href="/business/business-dashboard" />;
+  }
+
+  return <Redirect href="/(tabs)" />;
 }

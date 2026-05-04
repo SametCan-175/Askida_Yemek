@@ -13,9 +13,11 @@ import {
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
+import { fetchMyBadges } from '../../services/badges';
+
 const { width } = Dimensions.get('window');
 
-// 1. KART BİLEŞENİ GÜNCELLENDİ: Artık API'den gelen 'emoji' parametresini de destekliyor
+// 1. KART BİLEŞENİ: API'den gelen 'emoji' parametresini de destekliyor
 const AchievementCard = ({ title, desc, icon, emoji, current, total, color, unlocked = false }: any) => {
   const progress = (current / total) * 100;
   
@@ -59,38 +61,22 @@ const AchievementCard = ({ title, desc, icon, emoji, current, total, color, unlo
 };
 
 export default function SpecialRewards() {
-  // 2. STATE'LER EKLENDİ
   const [earnedBadges, setEarnedBadges] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 3. SAYFA AÇILDIĞINDA API'YE İSTEK ATACAK useEffect
   useEffect(() => {
     fetchBadges();
   }, []);
 
   const fetchBadges = async () => {
     try {
-      // Backend'in verdiği endpoint
-      const response = await fetch('https://api.seninsiten.com/users/rozetler', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          // auth: true olduğu için kullanıcının token'ını buraya ekliyoruz
-          'Authorization': `Bearer BURAYA_KULLANICI_TOKENI_GELECEK` 
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setEarnedBadges(data); // API'den gelen diziyi state'e kaydet
-      } else {
-        console.log('Rozetler çekilemedi, durum kodu:', response.status);
-      }
-    } catch (error) {
+      const data = await fetchMyBadges();
+      setEarnedBadges(data);
+    } catch (error: any) {
       console.error("Rozet API Hatası:", error);
-      Alert.alert("Bağlantı Hatası", "Rozetleriniz şu an yüklenemiyor.");
+      Alert.alert("Bağlantı Hatası", error.message || "Rozetleriniz şu an yüklenemiyor.");
     } finally {
-      setIsLoading(false); // Yükleme bitti
+      setIsLoading(false);
     }
   };
 
@@ -123,7 +109,7 @@ export default function SpecialRewards() {
 
         <Text style={styles.sectionTitle}>KAZANILAN ROZETLER</Text>
 
-        {/* 4. YÜKLEME DURUMU VE VERİLERİN EKRANA BASILMASI */}
+        {/* YÜKLEME DURUMU VE VERİLERİN EKRANA BASILMASI */}
         {isLoading ? (
           <View style={{ padding: 40, alignItems: 'center' }}>
             <ActivityIndicator size="large" color="#0A4D44" />
@@ -149,8 +135,7 @@ export default function SpecialRewards() {
           </View>
         )}
 
-        {/* İleride backend "kilitli rozetleri" de dönerse buraya ekleyebiliriz. 
-            Şimdilik eski statik kilitli rozetleri örnek olarak aşağıda tutuyorum */}
+        {/* Statik kilitli rozetler — gelecekte backend'den gelebilir */}
         <Text style={[styles.sectionTitle, { marginTop: 20 }]}>KİLİTLİ BAŞARIMLAR</Text>
 
         <AchievementCard 

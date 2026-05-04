@@ -6,8 +6,8 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string, role: 'customer' | 'business') => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
+  register: (email: string, password: string, name: string, role: 'customer' | 'business') => Promise<User>;
   logout: () => Promise<void>;
 }
 
@@ -37,9 +37,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function handleLogin(email: string, password: string) {
+  async function handleLogin(email: string, password: string): Promise<User> {
     const loggedInUser = await apiLogin(email, password);
     setUser(loggedInUser);
+    return loggedInUser;
   }
 
   async function handleRegister(
@@ -47,9 +48,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     name: string,
     role: 'customer' | 'business'
-  ) {
+  ): Promise<User> {
     const newUser = await apiRegister(email, password, name, role);
     setUser(newUser);
+    return newUser;
   }
 
   async function handleLogout() {
