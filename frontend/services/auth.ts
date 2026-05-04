@@ -7,10 +7,15 @@ export interface User {
   id: number;
   email: string;
   full_name: string;
-  role: 'customer' | 'business';
-  is_active?: boolean;
-  created_at?: string;
-
+  role: string;
+  is_active: boolean;
+  created_at: string;
+  phone?: string | null;
+  birth_date?: string | null;
+  gender?: string | null;
+  city?: string | null;
+  district?: string | null;
+  address?: string | null;
 }
 
 export interface AuthResponse {
@@ -65,4 +70,21 @@ export async function getCurrentUser(): Promise<User> {
  */
 export async function logout(): Promise<void> {
   await clearToken();
+}
+export interface UserUpdateData {
+  full_name?: string;
+  phone?: string;
+  birth_date?: string;
+  gender?: string;
+  city?: string;
+  district?: string;
+  address?: string;
+}
+
+export async function updateMyProfile(data: UserUpdateData): Promise<User> {
+  return await api<User>('/users/me', {
+    method: 'PUT',
+    body: data,
+    requireAuth: true,
+  });
 }

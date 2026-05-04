@@ -70,7 +70,7 @@ export default function SettingsScreen() {
             <SettingRow icon="account-outline" title="Hesap Detayları" path="/settings/account-details" />
             <SettingRow icon="map-marker-outline" title="Adreslerim" path="/settings/addresses" />
             <SettingRow icon="shield-lock-outline" title="Şifre ve Güvenlik" path="/settings/security" />
-            <SettingRow icon="trophy-variant-outline" title="Özel Ödüller" path="/settings/special-rewards" isLast={true} />
+            <SettingRow icon="trophy-variant-outline" title="Özel Ödüller" path="/settings/special-rewards" isLast={true} />    
           </View>
 
           <Text style={styles.sectionLabel}>TERCİHLER</Text>

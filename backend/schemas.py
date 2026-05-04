@@ -2,6 +2,8 @@ from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional, List
 from datetime import datetime
 from models import UserRole, ListingStatus, ReservationStatus
+from typing import Optional, List
+from pydantic import BaseModel
 
 
 # ─────────────────────────────────────────
@@ -64,12 +66,26 @@ class UserOut(BaseModel):
     id: int
     email: str
     full_name: str
-    role: UserRole
+    role: str
     is_active: bool
     created_at: datetime
-
+    phone: Optional[str] = None
+    birth_date: Optional[str] = None
+    gender: Optional[str] = None
+    city: Optional[str] = None
+    district: Optional[str] = None
+    address: Optional[str] = None
+    
     model_config = {"from_attributes": True}
 
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    birth_date: Optional[str] = None
+    gender: Optional[str] = None
+    city: Optional[str] = None
+    district: Optional[str] = None
+    address: Optional[str] = None
 
 class Token(BaseModel):
     access_token: str
@@ -175,3 +191,73 @@ class ListingOut(BaseModel):
 class ListingList(BaseModel):
     total: int
     listings: List[ListingOut]
+class ShopHoursItem(BaseModel):
+    day_of_week: int  # 0-6
+    is_open: bool
+    open_time: Optional[str] = None
+    close_time: Optional[str] = None
+    pickup_start: Optional[str] = None
+    pickup_end: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class ShopHoursUpdate(BaseModel):
+    """7 günlük saatlerin tamamı bir seferde gönderilir."""
+    hours: List[ShopHoursItem]
+
+
+class ShopHoursOut(BaseModel):
+    shop_id: int
+    hours: List[ShopHoursItem]
+
+class ShopBankUpdate(BaseModel):
+    iban: str
+    account_holder: str
+    bank_name: Optional[str] = None
+
+
+class ShopBankOut(BaseModel):
+    shop_id: int
+    iban: str
+    account_holder: str
+    bank_name: Optional[str] = None
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+    
+class WithdrawCreate(BaseModel):
+    amount: float
+    iban: Optional[str] = None  # Yoksa shop'un kayıtlı IBAN'ı kullanılır
+    note: Optional[str] = None
+
+
+class WithdrawOut(BaseModel):
+    id: int
+    shop_id: int
+    amount: float
+    iban: str
+    status: str
+    note: Optional[str] = None
+    created_at: datetime
+    processed_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class WalletBalance(BaseModel):
+    shop_id: int
+    total_earned: float          # Toplam picked_up gelir
+    total_withdrawn: float       # Toplam çekilen
+    pending_withdraw: float      # İşlemde olan çekme
+    available_balance: float     # Çekilebilir bakiye
+
+
+class WalletTransaction(BaseModel):
+    """Tek bir cüzdan hareketi (gelir veya çekme)."""
+    id: str                      # "order-123" veya "withdraw-5"
+    type: str                    # "income" | "withdraw"
+    amount: float                # gelir +, çekme -
+    description: str
+    status: str
+    created_at: datetime

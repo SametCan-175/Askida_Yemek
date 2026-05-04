@@ -24,6 +24,12 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(Enum(UserRole), default=UserRole.customer, nullable=False)
     is_active = Column(Boolean, default=True)
+    phone = Column(String(20), nullable=True)
+    birth_date = Column(String(10), nullable=True)  # "01.01.2004" formatı
+    gender = Column(String(20), nullable=True)
+    city = Column(String(100), nullable=True)
+    district = Column(String(100), nullable=True)
+    address = Column(String(300), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # İlişkiler
@@ -139,5 +145,53 @@ class Notification(Base):
     badge_text = Column(String, nullable=True)
     is_read = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
- 
+
     user = relationship("User", backref="notifications")
+
+
+class ShopHours(Base):
+    """
+    Mağazanın her gün için çalışma/teslimat saatleri.
+    day_of_week: 0=Pazartesi, 1=Salı, ..., 6=Pazar
+    """
+    __tablename__ = "shop_hours"
+
+    id = Column(Integer, primary_key=True, index=True)
+    shop_id = Column(Integer, ForeignKey("shops.id", ondelete="CASCADE"), nullable=False)
+    day_of_week = Column(Integer, nullable=False)
+    is_open = Column(Boolean, default=True, nullable=False)
+    open_time = Column(String(5), nullable=True)
+    close_time = Column(String(5), nullable=True)
+    pickup_start = Column(String(5), nullable=True)
+    pickup_end = Column(String(5), nullable=True)
+
+    shop = relationship("Shop", backref="hours")
+
+class ShopBank(Base):
+    __tablename__ = "shop_bank"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    shop_id = Column(Integer, ForeignKey("shops.id", ondelete="CASCADE"), unique=True, nullable=False)
+    iban = Column(String(34), nullable=False)
+    account_holder = Column(String(150), nullable=False)
+    bank_name = Column(String(100), nullable=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    shop = relationship("Shop", backref="bank_info", uselist=False)
+
+class WithdrawRequest(Base):
+    """
+    İşletmenin bakiyesinden yapılan para çekme talepleri.
+    """
+    __tablename__ = "withdraw_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    shop_id = Column(Integer, ForeignKey("shops.id", ondelete="CASCADE"), nullable=False)
+    amount = Column(Float, nullable=False)
+    iban = Column(String(34), nullable=False)
+    status = Column(String(20), default="pending", nullable=False)  # pending, approved, paid, rejected
+    note = Column(String(300), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    processed_at = Column(DateTime(timezone=True), nullable=True)
+
+    shop = relationship("Shop", backref="withdraws")

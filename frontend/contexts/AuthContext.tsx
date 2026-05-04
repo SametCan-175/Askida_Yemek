@@ -9,6 +9,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<User>;
   register: (email: string, password: string, name: string, role: 'customer' | 'business') => Promise<User>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;  // ← BU SATIRI EKLE
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -42,6 +43,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(loggedInUser);
     return loggedInUser;
   }
+  async function refreshUser() {
+  try {
+    const currentUser = await getCurrentUser();
+    setUser(currentUser);
+  } catch (err) {
+    console.log('User refresh failed:', err);
+  }
+}
 
   async function handleRegister(
     email: string,
@@ -68,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login: handleLogin,
         register: handleRegister,
         logout: handleLogout,
+        refreshUser, 
       }}
     >
       {children}

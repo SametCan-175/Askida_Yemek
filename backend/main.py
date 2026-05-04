@@ -4,7 +4,7 @@ from database import Base, engine
 from routers import (
     auth, shops, listings, ai_listings, 
     reservations, analytics, ai_integration, 
-    users, notifications
+    users, notifications, wallet
 )
 from scheduler import start_scheduler
 
@@ -36,7 +36,7 @@ app.include_router(reservations.router,   prefix="/reservations",  tags=["Reserv
 app.include_router(analytics.router,      prefix="/analytics",     tags=["Analytics"])
 app.include_router(notifications.router,  prefix="/notifications", tags=["Notifications"])
 app.include_router(ai_integration.router, prefix="", tags=["AI Integration"])
-
+app.include_router(wallet.router, prefix="/shops", tags=["Wallet"])
 
 @app.on_event("startup")
 def startup():

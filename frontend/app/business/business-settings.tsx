@@ -1,19 +1,23 @@
-import { useAuth } from '../../contexts/AuthContext'; // Yol dosyaya göre değişir
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { 
   View, 
   Text, 
   StyleSheet, 
   SafeAreaView, 
   ScrollView, 
-  TouchableOpacity 
+  TouchableOpacity,
+  ActivityIndicator
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+
+import { useAuth } from '../../contexts/AuthContext';
+import { fetchMyShop, Shop } from '../../services/business';
+
 const SettingsRow = ({ icon, label, isLast = false, onPress }: any) => (
   <TouchableOpacity 
     style={[styles.rowContainer, isLast && styles.lastRow]} 
-    onPress={onPress} // Tıklama özelliği burada aktif
+    onPress={onPress}
     activeOpacity={0.7}
   >
     <View style={styles.rowLeft}>
@@ -25,7 +29,39 @@ const SettingsRow = ({ icon, label, isLast = false, onPress }: any) => (
 );
 
 export default function BusinessSettingsScreen() {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
+  const [shop, setShop] = useState<Shop | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      (async () => {
+        if (!user) return;
+        try {
+          const myShop = await fetchMyShop(user.id);
+          setShop(myShop);
+        } catch (err) {
+          console.log('Mağaza yüklenemedi:', err);
+        } finally {
+          setIsLoading(false);
+        }
+      })();
+    }, [user])
+  );
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/login');
+  };
+
+  // Mağaza adından kısa harf üret (logo için)
+  const displayName = shop?.name || user?.full_name || 'İşletme';
+  const initials = displayName
+    .split(' ')
+    .map(w => w.charAt(0).toUpperCase())
+    .slice(0, 2)
+    .join('');
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -40,10 +76,17 @@ export default function BusinessSettingsScreen() {
         
         <View style={styles.profileHeader}>
           <View style={styles.storeLogoCircle}>
-            <Text style={styles.storeLogoText}>TP</Text>
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.storeLogoText}>{initials}</Text>
+            )}
           </View>
           <View style={styles.profileTextContainer}>
-            <Text style={styles.storeName}>Trakya Pastanesi</Text>
+            <Text style={styles.storeName}>{displayName}</Text>
+            {shop?.city && (
+              <Text style={styles.storeCity}>{shop.address || shop.city}</Text>
+            )}
             <TouchableOpacity onPress={() => router.push('/business/store-setup')}>
               <Text style={styles.editProfileText}>İşletme Profilini Düzenle</Text>
             </TouchableOpacity>
@@ -55,17 +98,22 @@ export default function BusinessSettingsScreen() {
           <SettingsRow 
             icon="storefront-outline" 
             label="Mağaza Detayları ve Konum" 
-            onPress={() => router.push('/business/business-detail')} // Adım 1'e gider
+            onPress={() => router.push('/business/business-detail')}
           />
           <SettingsRow 
             icon="clock-time-four-outline" 
             label="Teslimat Saatleri" 
-            onPress={() => router.push('/business/business-times')} // Adım 2'ye gider
+            onPress={() => router.push('/business/business-times')}
           />
           <SettingsRow 
             icon="bank-outline" 
             label="IBAN ve Ödeme Bilgileri" 
-            onPress={() => router.push('/business/business-payments')} // Adım 2'ye gider
+            onPress={() => router.push('/business/business-payments')}
+          />
+          <SettingsRow 
+            icon="wallet-outline" 
+            label="Cüzdan ve Bakiye" 
+            onPress={() => router.push('/business/wallet')}
           />
           <SettingsRow 
             icon="history" 
@@ -77,17 +125,16 @@ export default function BusinessSettingsScreen() {
 
         <Text style={styles.groupLabel}>CİHAZ VE TERCİHLER</Text>
         <View style={styles.menuCard}>
-          {/* Senin 'settings' klasöründeki dosyalara gidiyorlar */}
           <SettingsRow 
             icon="bell-outline" 
             label="Bildirim Ayarları" 
-            onPress={() => router.push('/settings/notifications')} //
+            onPress={() => router.push('/settings/notifications')}
           />
           <SettingsRow 
             icon="shield-lock-outline" 
             label="Şifre ve Güvenlik" 
             isLast={true} 
-            onPress={() => router.push('/settings/security')} //
+            onPress={() => router.push('/settings/security')}
           />
         </View>
 
@@ -96,27 +143,25 @@ export default function BusinessSettingsScreen() {
           <SettingsRow 
             icon="help-circle-outline" 
             label="Yardım Merkezi" 
-            onPress={() => router.push('/settings/support')} //
+            onPress={() => router.push('/support')}
           />
           <SettingsRow 
             icon="file-document-outline" 
             label="Kullanım Koşulları" 
-            onPress={() => router.push('/settings/terms')} //
+            onPress={() => router.push('/settings/terms')}
           />
           <SettingsRow 
             icon="shield-check-outline" 
             label="Gizlilik Politikası" 
             isLast={true} 
-            onPress={() => router.push('/settings/privacy')} //
+            onPress={() => router.push('/settings/privacy')}
           />
         </View>
 
         <TouchableOpacity 
           style={styles.logoutButton}
-         onPress={async () => {
-  await logout();
-  router.replace('/login');
-}} //
+          onPress={handleLogout}
+          activeOpacity={0.7}
         >
           <Text style={styles.logoutText}>Hesaptan Çıkış Yap</Text>
         </TouchableOpacity>
@@ -135,10 +180,11 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
   profileHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 30, marginTop: 10 },
   storeLogoCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#0A4D44', justifyContent: 'center', alignItems: 'center' },
-  storeLogoText: { fontSize: 24, fontWeight: '800', color: '#FFFFFF' },
-  profileTextContainer: { marginLeft: 16 },
-  storeName: { fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 4 },
-  editProfileText: { fontSize: 14, color: '#6B7280', textDecorationLine: 'underline' },
+  storeLogoText: { fontSize: 22, fontWeight: '800', color: '#FFFFFF' },
+  profileTextContainer: { marginLeft: 16, flex: 1 },
+  storeName: { fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 2 },
+  storeCity: { fontSize: 13, color: '#6B7280', marginBottom: 4 },
+  editProfileText: { fontSize: 14, color: '#0A4D44', textDecorationLine: 'underline', fontWeight: '600' },
   groupLabel: { fontSize: 12, fontWeight: '800', color: '#9CA3AF', marginBottom: 10, letterSpacing: 1 },
   menuCard: { backgroundColor: '#FFFFFF', borderRadius: 20, marginBottom: 24, paddingHorizontal: 16, elevation: 1, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5 },
   rowContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },

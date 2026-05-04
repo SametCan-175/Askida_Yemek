@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from typing import Optional, List
 from pydantic import BaseModel
 from datetime import datetime
-
+from schemas import UserUpdate, UserOut
 from database import get_db
 from models import User, UserBadge
 from security import get_current_user
@@ -85,3 +85,35 @@ def benim_rozetlerim(
         .order_by(UserBadge.earned_at.desc())
         .all()
     )
+
+from schemas import UserUpdate
+
+
+@router.put("/me", response_model=UserOut)
+def update_my_profile(
+    payload: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Kendi profilimi güncelle."""
+    if payload.full_name is not None:
+        if len(payload.full_name.strip()) < 2:
+            raise HTTPException(status_code=400, detail="Ad çok kısa.")
+        current_user.full_name = payload.full_name.strip()
+    
+    if payload.phone is not None:
+        current_user.phone = payload.phone.strip() or None
+    if payload.birth_date is not None:
+        current_user.birth_date = payload.birth_date.strip() or None
+    if payload.gender is not None:
+        current_user.gender = payload.gender.strip() or None
+    if payload.city is not None:
+        current_user.city = payload.city.strip() or None
+    if payload.district is not None:
+        current_user.district = payload.district.strip() or None
+    if payload.address is not None:
+        current_user.address = payload.address.strip() or None
+    
+    db.commit()
+    db.refresh(current_user)
+    return current_user

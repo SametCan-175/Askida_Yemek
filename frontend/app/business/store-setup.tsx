@@ -17,7 +17,13 @@ import * as ImagePicker from 'expo-image-picker';
 import MapView from 'react-native-maps'; 
 import * as Location from 'expo-location'; 
 
-const CATEGORIES = ["Fırın & Pastane", "Restoran", "Kafe", "Market", "Diğer"];
+const CATEGORIES = [
+  { label: "Fırın & Pastane", value: "fırın" },
+  { label: "Restoran", value: "restoran" },
+  { label: "Kafe", value: "kafe" },
+  { label: "Market", value: "market" },
+  { label: "Diğer", value: "diğer" },
+];
 
 export default function StoreSetupScreen() {
   const mapRef = useRef<MapView>(null); 
@@ -84,19 +90,31 @@ export default function StoreSetupScreen() {
 
   const handleConfirmLocation = () => {
     if (location) {
-      setAddress(`Konum Belirlendi (${location.latitude.toFixed(4)})`);
+      setAddress(`Konum Belirlendi (${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)})`);
       setIsMapVisible(false);
     }
   };
 
-  const handleFinishSetup = () => {
+  const handleNext = () => {
     if (!storeName || !selectedCategory || !location) {
       Alert.alert("Eksik Bilgi", "Lütfen tüm alanları doldurun.");
       return;
     }
-    // DÜZELTİLEN YER: Artık Adım 2'ye gidiyor
-    router.push('/business/store-setup-step2');
+    
+    // Verileri step2'ye taşı
+    router.push({
+      pathname: '/business/store-setup-step2',
+      params: {
+        storeName,
+        category: selectedCategory,
+        latitude: location.latitude.toString(),
+        longitude: location.longitude.toString(),
+        imageUri: imageUri || '',
+      }
+    });
   };
+
+  const isFormValid = storeName.trim().length >= 2 && selectedCategory && location;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -118,36 +136,40 @@ export default function StoreSetupScreen() {
           ) : (
             <View style={styles.placeholderContainer}>
               <View style={styles.iconCircle}><Ionicons name="camera" size={28} color="#0A4D44" /></View>
-              <Text style={styles.uploadText}>Mağaza Görseli Ekle</Text>
+              <Text style={styles.uploadText}>Mağaza Görseli Ekle (opsiyonel)</Text>
             </View>
           )}
         </TouchableOpacity>
 
-        <Text style={styles.label}>İşletme Adı</Text>
+        <Text style={styles.label}>İşletme Adı *</Text>
         <View style={styles.inputContainer}>
           <Ionicons name="storefront-outline" size={20} color="#6B7280" style={styles.inputIcon} />
           <TextInput
             style={styles.input}
-            placeholder="Örn: Trakya Pastanesi"
+            placeholder="Örn: Ayşe'nin Fırını"
+            placeholderTextColor="#9CA3AF"
             value={storeName}
             onChangeText={setStoreName}
+            maxLength={60}
           />
         </View>
 
-        <Text style={styles.label}>İşletme Türü</Text>
+        <Text style={styles.label}>İşletme Türü *</Text>
         <View style={styles.categoryContainer}>
-          {CATEGORIES.map((cat, index) => (
+          {CATEGORIES.map((cat) => (
             <TouchableOpacity 
-              key={index}
-              style={[styles.categoryChip, selectedCategory === cat && styles.categoryChipActive]}
-              onPress={() => setSelectedCategory(cat)}
+              key={cat.value}
+              style={[styles.categoryChip, selectedCategory === cat.value && styles.categoryChipActive]}
+              onPress={() => setSelectedCategory(cat.value)}
             >
-              <Text style={[styles.categoryText, selectedCategory === cat && styles.categoryTextActive]}>{cat}</Text>
+              <Text style={[styles.categoryText, selectedCategory === cat.value && styles.categoryTextActive]}>
+                {cat.label}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <Text style={styles.label}>Konum & Adres</Text>
+        <Text style={styles.label}>Konum & Adres *</Text>
         <TouchableOpacity 
           style={styles.locationButton}
           activeOpacity={0.7}
@@ -157,7 +179,7 @@ export default function StoreSetupScreen() {
           <View style={styles.locationTextContainer}>
             <Text style={styles.locationTitle}>Haritadan Konum Seç</Text>
             <Text style={styles.locationDesc} numberOfLines={1}>
-              {address || "Müşterilerin seni kolayca bulması için"}
+              {address || (location ? `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}` : "Konum aranıyor...")}
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
@@ -166,9 +188,9 @@ export default function StoreSetupScreen() {
 
       <View style={styles.footer}>
         <TouchableOpacity 
-          style={[styles.continueButton, (!storeName || !selectedCategory || !location) && styles.buttonDisabled]}
-          onPress={handleFinishSetup}
-          disabled={!storeName || !selectedCategory || !location}
+          style={[styles.continueButton, !isFormValid && styles.buttonDisabled]}
+          onPress={handleNext}
+          disabled={!isFormValid}
         >
           <Text style={styles.continueButtonText}>İleri</Text>
         </TouchableOpacity>
@@ -192,8 +214,8 @@ export default function StoreSetupScreen() {
               showsUserLocation={true} 
               showsMyLocationButton={false} 
               initialRegion={{
-                latitude: location?.latitude || 41.6772, 
-                longitude: location?.longitude || 26.5550,
+                latitude: location?.latitude || 40.8533, 
+                longitude: location?.longitude || 26.6300,
                 latitudeDelta: 0.005,
                 longitudeDelta: 0.005,
               }}
