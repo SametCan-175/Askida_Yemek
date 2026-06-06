@@ -51,11 +51,17 @@ class UserRegister(BaseModel):
 
     @field_validator("password")
     @classmethod
-    def password_min_length(cls, v: str) -> str:
-        if len(v) < 6:
-            raise ValueError("Şifre en az 6 karakter olmalıdır.")
+    def password_strength(cls, v: str) -> str:
+        import re
+        if len(v) < 8:
+            raise ValueError("Şifre en az 8 karakter olmalıdır.")
+        if not re.search(r'[A-Z]', v):
+            raise ValueError("Şifre en az 1 büyük harf içermelidir.")
+        if not re.search(r'[a-z]', v):
+            raise ValueError("Şifre en az 1 küçük harf içermelidir.")
+        if not re.search(r'\d', v):
+            raise ValueError("Şifre en az 1 rakam içermelidir.")
         return v
-
 
 class UserLogin(BaseModel):
     email: EmailStr

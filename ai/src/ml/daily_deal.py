@@ -1,9 +1,12 @@
 import os
+from pathlib import Path
 from datetime import datetime
 from groq import Groq
 from dotenv import load_dotenv
 
-load_dotenv()
+# .env dosyasını yükle
+env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+load_dotenv(env_path)
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 MODEL = "llama-3.3-70b-versatile"
 APP_ADI = "Son Lokma"

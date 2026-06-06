@@ -29,10 +29,24 @@ export default function EmailLoginScreen() {
       Alert.alert('Eksik bilgi', 'Lütfen adını gir.');
       return;
     }
-    if (password.length < 6) {
-      Alert.alert('Şifre kısa', 'Şifre en az 6 karakter olmalı.');
-      return;
-    }
+if (isRegisterMode) {
+  if (password.length < 8) {
+    Alert.alert('Şifre kısa', 'Şifre en az 8 karakter olmalı.');
+    return;
+  }
+  if (!/[A-Z]/.test(password)) {
+    Alert.alert('Şifre zayıf', 'Şifre en az 1 büyük harf içermeli.');
+    return;
+  }
+  if (!/[a-z]/.test(password)) {
+    Alert.alert('Şifre zayıf', 'Şifre en az 1 küçük harf içermeli.');
+    return;
+  }
+  if (!/\d/.test(password)) {
+    Alert.alert('Şifre zayıf', 'Şifre en az 1 rakam içermeli.');
+    return;
+  }
+}
 
     setIsLoading(true);
     try {

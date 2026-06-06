@@ -17,11 +17,14 @@ Batuhan'ın çağıracağı fonksiyon:
 
 import logging
 import os
+from pathlib import Path
 from groq import Groq
-from dotenv import find_dotenv, load_dotenv
+from dotenv import load_dotenv
 
-load_dotenv(find_dotenv())
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+# .env dosyasını yükle
+env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+load_dotenv(env_path, override=True)
+GROQ_API_KEY = (os.environ.get("GROQ_API_KEY") or "").strip()
 client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 MODEL = "llama-3.3-70b-versatile"
 APP_ADI = "Son Lokma"

@@ -9,7 +9,7 @@ import {
   Dimensions,
   ActivityIndicator,
   Alert
-} from 'react-native';
+} from 'react-native'; 9
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
