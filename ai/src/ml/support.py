@@ -16,6 +16,7 @@ Batuhan'ın çağıracağı fonksiyon:
 """
 
 import logging
+import re
 import os
 from pathlib import Path
 from groq import Groq
@@ -31,7 +32,34 @@ APP_ADI = "Son Lokma"
 
 logger = logging.getLogger("SonLokma.Destek")
 
-# Ajanın kişiliği ve kuralları
+# ── Prompt Injection Koruması ─────────────────────────────────────────────────
+YASAKLI_KALIPLAR = [
+    r"ignore\b.*?\binstructions",        # "ignore all previous instructions" gibi tüm varyantlar
+    r"forget\b.*?\binstructions",        # "forget your instructions" varyantları
+    r"override\b.*?\binstructions",      # "override all instructions"
+    r"disregard\b.*?\binstructions",     # "disregard previous instructions"
+    r"system\s*:",                       # "system:" ile başlayan prompt injection
+    r"developer mode",                   # developer mode aktivasyonu
+    r"jailbreak",                        # jailbreak girişimi
+    r"drop\s+table",                     # SQL injection
+    r"\.\./",                            # path traversal
+    r"<script",                          # XSS
+    r"prompt\s*injection",               # açık injection denemesi
+    r"you are now",                      # "you are now an unrestricted AI"
+    r"pretend (you are|to be)",          # kimlik değiştirme
+    r"act as (a |an )?.*?(unrestricted|without restriction|no limit)",  # kısıtsız AI talebi
+]
+
+def prompt_guvenlik_kontrolu(metin: str) -> bool:
+    """True dönerse mesaj güvenli, False dönerse tehlikeli."""
+    if len(metin) > 2000:
+        return False
+    for kalip in YASAKLI_KALIPLAR:
+        if re.search(kalip, metin, re.IGNORECASE):
+            return False
+    return True
+
+# ── Ajanın kişiliği ve kuralları ─────────────────────────────────────────────
 SISTEM_PROMPTU = f"""Sen '{APP_ADI}' uygulamasının canlı destek asistanısın. 
 Adın 'Lokma'.
 
@@ -88,6 +116,14 @@ def destek_ajani_yanit(
     """
     if konusma_gecmisi is None:
         konusma_gecmisi = []
+
+    # ── Güvenlik kontrolü ────────────────────────────────────────────────────
+    if not prompt_guvenlik_kontrolu(yeni_mesaj):
+        logger.warning(f"⚠️ Şüpheli mesaj engellendi — user:{user_id} mesaj:'{yeni_mesaj[:50]}'")
+        return {
+            "yanit": "Bu mesajı işleyemiyorum. Lütfen uygun bir soru sorun. 🙏",
+            "guncellenmis_gecmis": konusma_gecmisi
+        }
 
     logger.info(f"💬 Destek isteği — user:{user_id} mesaj:'{yeni_mesaj[:50]}...'")
 

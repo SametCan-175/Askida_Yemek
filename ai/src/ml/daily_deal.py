@@ -1,13 +1,25 @@
 import os
+import logging
 from pathlib import Path
 from datetime import datetime
 from groq import Groq
 from dotenv import load_dotenv
 
+logger = logging.getLogger("SonLokma.DailyDeal")
+
 # .env dosyasını yükle
 env_path = Path(__file__).resolve().parent.parent.parent / ".env"
 load_dotenv(env_path)
-client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+
+# ── API Key Kontrolü ──────────────────────────────────────────────────────────
+GROQ_API_KEY = (os.environ.get("GROQ_API_KEY") or "").strip()
+
+if not GROQ_API_KEY:
+    logger.warning("⚠️ GROQ_API_KEY bulunamadı! .env dosyasını kontrol et.")
+    client = None
+else:
+    client = Groq(api_key=GROQ_API_KEY)
+
 MODEL = "llama-3.3-70b-versatile"
 APP_ADI = "Son Lokma"
 
@@ -20,16 +32,25 @@ AGIRLIKLAR = {
 
 
 def groq_cagir(sistem_prompt, kullanici_mesaji, sicaklik=0.6):
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=[
-            {"role": "system", "content": sistem_prompt},
-            {"role": "user", "content": kullanici_mesaji}
-        ],
-        temperature=sicaklik,
-        max_tokens=256,
-    )
-    return response.choices[0].message.content
+    if client is None:
+        logger.error("❌ Groq client başlatılamadı, API key eksik.")
+        return None
+
+    try:
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {"role": "system", "content": sistem_prompt},
+                {"role": "user", "content": kullanici_mesaji}
+            ],
+            temperature=sicaklik,
+            max_tokens=256,
+            timeout=30,
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        logger.error(f"❌ Groq API hatası: {e}")
+        return None
 
 
 def indirim_orani_skoru(indirim):
@@ -119,13 +140,24 @@ Mekan puanı: {en_iyi['yildiz']}/5
 Fırsat skoru: {en_iyi['firsat_skoru']}
 """
 
-    kart_metni = groq_cagir(sistem_prompt, kullanici_mesaji)
+    # ── Groq çağrısı — key yoksa veya hata olursa fallback kart metni ────────
+    kart_metni_ham = groq_cagir(sistem_prompt, kullanici_mesaji)
+
+    if kart_metni_ham:
+        kart_metni = kart_metni_ham.strip()
+    else:
+        # Groq kullanılamıyorsa sabit kart metni üret
+        kart_metni = (
+            f"🔥 {en_iyi['kafe']}'da {en_iyi['urun']} sadece {indirimli_fiyat}₺! "
+            f"%{en_iyi['indirim']} indirimle sadece {en_iyi['adet']} porsiyon kaldı."
+        )
+        logger.warning("⚠️ Groq kullanılamadı, fallback kart metni kullanıldı.")
 
     print(f"[AJAN 7] Günün fırsatı: {en_iyi['urun']} — {en_iyi['kafe']} ({en_iyi['firsat_skoru']} puan)")
     return {
         "firsat": en_iyi,
         "indirimli_fiyat": indirimli_fiyat,
-        "kart_metni": kart_metni.strip()
+        "kart_metni": kart_metni
     }
 
 
@@ -144,19 +176,16 @@ def run():
         from services.api_client import AIListingService
         service = AIListingService()
 
-        # Batuhan'ın API'sinden aktif ilanları çek
-        # Merkezi bir konum kullanıyoruz (şehir merkezi gibi)
         urun_listesi = service.fetch_targeted_listings(
             latitude=41.010,
             longitude=29.010,
-            radius=10.0  # Günün fırsatı için daha geniş radius
+            radius=10.0
         )
 
         if not urun_listesi:
             print("[AJAN 7] API'den ilan gelmedi, test verisiyle devam ediliyor...")
             raise Exception("Boş liste")
 
-        # API formatını daily_deal formatına çevir
         donusturulmus = []
         for u in urun_listesi:
             donusturulmus.append({
@@ -166,7 +195,7 @@ def run():
                 "fiyat": u.get("fiyat", 100),
                 "indirim": u.get("indirim_orani", 0),
                 "adet": u.get("adet", 0),
-                "yildiz": 4.0  # Batuhan yıldız ekleyene kadar sabit
+                "yildiz": 4.0
             })
 
         sonuc = ajan7_gunun_firsati(donusturulmus)
@@ -174,7 +203,6 @@ def run():
     except Exception as e:
         print(f"[AJAN 7] API hatası ({e}), test verisiyle çalışıyor...")
 
-        # Fallback: test verisiyle çalış
         test_urunler = [
             {"id": "u1", "kafe": "Merkez Kafe", "urun": "Karışık Sandviç",
              "fiyat": 120, "indirim": 40, "adet": 5, "yildiz": 4.2},
@@ -196,7 +224,6 @@ def run():
 
 
 if __name__ == "__main__":
-
     test_urunler = [
         {
             "id": "u1", "kafe": "Merkez Kafe", "urun": "Karışık Sandviç",

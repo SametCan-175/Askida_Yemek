@@ -3,8 +3,10 @@ from __future__ import annotations
 import os
 import sys
 from typing import Any, Dict, List, Optional
+from datetime import datetime
+from collections import defaultdict
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -47,13 +49,35 @@ class SupportRequest(BaseModel):
 
 app = FastAPI(title="Askida Yemek AI Service", version="1.0.0")
 
+# ── CORS: Sadece kendi servislerimize izin ver ────────────────────────────────
+IZIN_VERILEN_ORIGINS = [
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://localhost:8081",
+    "http://127.0.0.1:8081",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=IZIN_VERILEN_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "Authorization"],
 )
+
+# ── Rate Limiting: IP başına dakikada max 30 istek ───────────────────────────
+istek_sayaci: Dict[str, List[datetime]] = defaultdict(list)
+MAX_ISTEK = 30
+PENCERE_SANIYE = 60
+
+def rate_limit_kontrol(ip: str):
+    simdi = datetime.now()
+    gecmis = istek_sayaci[ip]
+    gecerli = [t for t in gecmis if (simdi - t).seconds < PENCERE_SANIYE]
+    gecerli.append(simdi)
+    istek_sayaci[ip] = gecerli
+    if len(gecerli) > MAX_ISTEK:
+        raise HTTPException(status_code=429, detail="Çok fazla istek. Lütfen bekleyin.")
 
 
 def _badge_for(item: Dict[str, Any]) -> str:
@@ -100,11 +124,16 @@ def health():
 
 
 @app.post("/score")
-def score_listings(payload: ScoreRequest):
-    processed = urunleri_isle(payload.listings)
-    ranked = feed_ranker(processed)
-    user = payload.user_context.model_dump()
-    personalized = get_personalized_recommendations(user, ranked) or ranked
+def score_listings(request: Request, payload: ScoreRequest):
+    rate_limit_kontrol(request.client.host)
+
+    try:
+        processed = urunleri_isle(payload.listings)
+        ranked = feed_ranker(processed)
+        user = payload.user_context.model_dump()
+        personalized = get_personalized_recommendations(user, ranked) or ranked
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Skorlama hatası: {str(e)}")
 
     scored_listings = []
     for item in personalized:
@@ -131,11 +160,19 @@ def score_listings(payload: ScoreRequest):
 
 
 @app.post("/support")
-def support_chat(payload: SupportRequest):
+def support_chat(request: Request, payload: SupportRequest):
+    rate_limit_kontrol(request.client.host)
+
+    if not payload.mesaj or not payload.mesaj.strip():
+        raise HTTPException(status_code=400, detail="Mesaj boş olamaz.")
+
+    if len(payload.mesaj) > 2000:
+        raise HTTPException(status_code=400, detail="Mesaj çok uzun (max 2000 karakter).")
+
     history = _normalize_history(payload.konusma_gecmisi)
+
     try:
         from ml.support import destek_ajani_yanit
-
         return destek_ajani_yanit(
             user_id=payload.user_id,
             yeni_mesaj=payload.mesaj,

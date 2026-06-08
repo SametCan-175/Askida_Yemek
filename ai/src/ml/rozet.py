@@ -1,13 +1,25 @@
 import os
 from pathlib import Path
 import json
+import logging
 from groq import Groq
 from dotenv import load_dotenv
+
+logger = logging.getLogger("SonLokma.Rozet")
 
 # .env dosyasını yükle
 env_path = Path(__file__).resolve().parent.parent.parent / ".env"
 load_dotenv(env_path)
-client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+
+# ── API Key Kontrolü ──────────────────────────────────────────────────────────
+GROQ_API_KEY = (os.environ.get("GROQ_API_KEY") or "").strip()
+
+if not GROQ_API_KEY:
+    logger.warning("⚠️ GROQ_API_KEY bulunamadı! .env dosyasını kontrol et.")
+    client = None
+else:
+    client = Groq(api_key=GROQ_API_KEY)
+
 MODEL = "llama-3.3-70b-versatile"
 APP_ADI = "Son Lokma"
 
@@ -51,19 +63,30 @@ ROZETLER = [
 
 
 def groq_cagir(sistem_prompt, kullanici_mesaji, sicaklik=0.4):
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=[
-            {"role": "system", "content": sistem_prompt},
-            {"role": "user", "content": kullanici_mesaji}
-        ],
-        temperature=sicaklik,
-        max_tokens=512,
-    )
-    return response.choices[0].message.content
+    if client is None:
+        logger.error("❌ Groq client başlatılamadı, API key eksik.")
+        return None
+
+    try:
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {"role": "system", "content": sistem_prompt},
+                {"role": "user", "content": kullanici_mesaji}
+            ],
+            temperature=sicaklik,
+            max_tokens=512,
+            timeout=30,
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        logger.error(f"❌ Groq API hatası: {e}")
+        return None
 
 
 def json_parse(yanit):
+    if not yanit:
+        raise ValueError("Groq'tan boş yanıt geldi")
     try:
         return json.loads(yanit)
     except json.JSONDecodeError:
@@ -113,10 +136,23 @@ Kazanılan rozet: {rozet['emoji']} {rozet['ad']}
 Rozet açıklaması: {rozet['aciklama']}
 Toplam sipariş sayısı: {siparis_sayisi}
 """
-        mesaj = groq_cagir(sistem_prompt, kullanici_mesaji, sicaklik=0.7)
+        # ── Groq çağrısı — key yoksa veya hata olursa fallback mesaj kullan ──
+        mesaj_ham = groq_cagir(sistem_prompt, kullanici_mesaji, sicaklik=0.7)
+
+        if mesaj_ham:
+            mesaj = mesaj_ham.strip()
+        else:
+            # Groq kullanılamıyorsa sabit kutlama mesajı
+            mesaj = (
+                f"Tebrikler {kullanici['ad']}! "
+                f"{rozet['emoji']} {rozet['ad']} rozetini kazandın! "
+                f"{rozet['aciklama']}"
+            )
+            logger.warning(f"⚠️ Groq kullanılamadı, fallback mesaj kullanıldı → {rozet['id']}")
+
         kutlama_mesajlari.append({
             "rozet": rozet,
-            "mesaj": mesaj.strip()
+            "mesaj": mesaj
         })
         kullanici.setdefault("rozetler", []).append(rozet)
 
