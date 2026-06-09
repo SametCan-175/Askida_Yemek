@@ -18,7 +18,7 @@ class AIListingService:
         try:
             url = f"{self.base_url}/listings/ai-fırsatlar"
             logger.info(f"🛰️ Listing'ler çekiliyor: lat={params['lat']}, lon={params['lon']}")
-            response = requests.get(url, params=params)
+            response = requests.get(url, params=params, timeout=10)
 
             if response.status_code == 422:
                 logger.error(f"422 Hatası: {response.json()}")
@@ -61,7 +61,7 @@ class AIListingService:
             url = f"{self.base_url}/listings/ai-scores"
             logger.info(f"📤 {len(sonuclar)} skor backend'e gönderiliyor...")
             # Batuhan'ın endpoint'i {"scores": [...]} formatı bekliyor
-            response = requests.post(url, json={"scores": sonuclar})
+            response = requests.post(url, json={"scores": sonuclar}, timeout=10)
 
             if response.status_code == 422:
                 logger.error(f"422 Hatası: {response.json()}")
@@ -82,7 +82,7 @@ class AIListingService:
         try:
             url = f"{self.base_url}/ai/siparis-tamamlandi"
             payload = {"user_id": user_id, "listing_id": listing_id}
-            response = requests.post(url, json=payload)
+            response = requests.post(url, json=payload, timeout=10)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
@@ -124,7 +124,7 @@ class AIListingService:
                 **rozet_sonucu
             }
             logger.info(f"🏅 {len(rozet_sonucu['yeni_rozetler'])} rozet backend'e gönderiliyor...")
-            response = requests.post(url, json=payload)
+            response = requests.post(url, json=payload, timeout=10)
 
             if response.status_code == 422:
                 logger.error(f"422 Hatası: {response.json()}")
@@ -136,3 +136,5 @@ class AIListingService:
         except requests.exceptions.RequestException as e:
             logger.error(f"❌ Rozet gönderme hatası: {str(e)}")
             return None
+
+

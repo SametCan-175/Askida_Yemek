@@ -23,7 +23,7 @@ def _bildirim_gonder(user_id: int, baslik: str, mesaj: str, tip: str, ekstra: di
     }
 
     try:
-        response = requests.post(BILDIRIM_ENDPOINT, json=payload)
+        response = requests.post(BILDIRIM_ENDPOINT, json=payload, timeout=10)
         response.raise_for_status()
         logger.info(f"🔔 Bildirim gönderildi → user:{user_id} tip:{tip}")
         return True

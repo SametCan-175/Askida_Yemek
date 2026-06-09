@@ -4,7 +4,10 @@ from groq import Groq
 from dotenv import load_dotenv
 
 load_dotenv()
-client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+groq_api_key = os.environ.get("GROQ_API_KEY")
+if not groq_api_key:
+    raise ValueError("GROQ_API_KEY bulunamadi! .env dosyasini kontrol et.")
+client = Groq(api_key=groq_api_key)
 MODEL = "llama-3.3-70b-versatile"
 APP_ADI = "Son Lokma"
 
