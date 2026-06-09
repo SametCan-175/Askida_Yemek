@@ -115,5 +115,60 @@ def update_my_profile(
         current_user.address = payload.address.strip() or None
     
     db.commit()
-    db.refresh(current_user)
+    db.refresh(current_user)    
     return current_user
+@router.delete("/me")
+def delete_my_account(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Kendi hesabımı kalıcı olarak sil.
+    İşletme hesapları için: önce mağaza ve bağlı kayıtlar silinmeli.
+    """
+    user_id = current_user.id
+    role = current_user.role
+    
+    # Eğer işletme hesabıysa, mağazasını ve bağlı her şeyi sil
+    if role == "business":
+        from models import Shop, Listing, Reservation, ShopHours, ShopBank, WithdrawRequest, ListingAiScore
+        
+        shop = db.query(Shop).filter(Shop.owner_id == user_id).first()
+        if shop:
+            # AI skorları sil
+            listing_ids = [l.id for l in db.query(Listing).filter(Listing.shop_id == shop.id).all()]
+            if listing_ids:
+                db.query(ListingAiScore).filter(ListingAiScore.listing_id.in_(listing_ids)).delete(synchronize_session=False)
+                db.query(Reservation).filter(Reservation.listing_id.in_(listing_ids)).delete(synchronize_session=False)
+            
+            # Listings sil
+            db.query(Listing).filter(Listing.shop_id == shop.id).delete(synchronize_session=False)
+            
+            # Shop'a bağlı diğerleri
+            db.query(ShopHours).filter(ShopHours.shop_id == shop.id).delete(synchronize_session=False)
+            db.query(ShopBank).filter(ShopBank.shop_id == shop.id).delete(synchronize_session=False)
+            db.query(WithdrawRequest).filter(WithdrawRequest.shop_id == shop.id).delete(synchronize_session=False)
+            
+            # Shop sil
+            db.delete(shop)
+    
+    # Müşteri ise rezervasyonlarını sil
+    else:
+        from models import Reservation
+        db.query(Reservation).filter(Reservation.user_id == user_id).delete(synchronize_session=False)
+    
+    # Bildirimleri ve rozetleri sil
+    from models import Notification
+    db.query(Notification).filter(Notification.user_id == user_id).delete(synchronize_session=False)
+    
+    try:
+        from models import UserBadge
+        db.query(UserBadge).filter(UserBadge.user_id == user_id).delete(synchronize_session=False)
+    except Exception:
+        pass  # Eğer UserBadge yoksa skip
+    
+    # Son olarak kullanıcıyı sil
+    db.delete(current_user)
+    db.commit()
+    
+    return {"message": "Hesabınız kalıcı olarak silindi."}

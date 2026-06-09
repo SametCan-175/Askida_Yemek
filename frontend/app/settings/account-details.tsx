@@ -19,10 +19,10 @@ import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 
 import { useAuth } from '../../contexts/AuthContext';
-import { updateMyProfile } from '../../services/auth';
+import { updateMyProfile, deleteMyAccount } from '../../services/auth';
 
 export default function AccountDetails() {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, logout } = useAuth();
 
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -55,9 +55,6 @@ export default function AccountDetails() {
     if (!user) return;
     setIsSaving(true);
     try {
-      // full_name özel: name + surname şeklinde değil, tek field
-      // Ama edit modal'ında "Ad" ve "Soyad" ayrı. O yüzden bunları
-      // mevcut full_name'i parse ederek birleştireceğiz.
       const parts = (user.full_name || '').trim().split(' ');
       const currentName = parts[0] || '';
       const currentSurname = parts.slice(1).join(' ') || '';
@@ -90,7 +87,6 @@ export default function AccountDetails() {
           updatePayload.address = editingField.value.trim();
           break;
         case 'email':
-          // Email değiştirme şu an desteklenmiyor (giriş için kullanılıyor)
           Alert.alert('Bilgi', 'E-posta adresi değiştirilemez. Bu giriş için kullanılan kimliğindir.');
           setModalVisible(false);
           setIsSaving(false);
@@ -109,15 +105,32 @@ export default function AccountDetails() {
 
   const handleDeleteAccount = () => {
     Alert.alert(
-      "Dikkat", 
-      "Hesabını kalıcı olarak silmek istediğine emin misin?",
+      "Hesabını Sil", 
+      "Hesabını kalıcı olarak silmek istediğine emin misin?\n\nTüm verilerin (siparişler, mağaza bilgileri, bildirimler) silinecek ve bu işlem geri alınamaz.",
       [
         { text: 'İptal', style: 'cancel' },
         { 
           text: 'Hesabımı Sil', 
           style: 'destructive',
-          onPress: () => {
-            Alert.alert('Bilgi', 'Hesap silme özelliği yakında eklenecek. Destek ekibiyle iletişime geç.');
+          onPress: async () => {
+            try {
+              await deleteMyAccount();
+              Alert.alert(
+                'Hesap Silindi', 
+                'Hesabın başarıyla silindi. Bizimle olduğun için teşekkürler.',
+                [
+                  { 
+                    text: 'Tamam', 
+                    onPress: async () => {
+                      await logout();
+                      router.replace('/login');
+                    }
+                  }
+                ]
+              );
+            } catch (err: any) {
+              Alert.alert('Hata', err.message || 'Hesap silinemedi. Lütfen tekrar dene.');
+            }
           }
         }
       ]
@@ -156,7 +169,6 @@ export default function AccountDetails() {
     );
   }
 
-  // İsim parçaları
   const nameParts = (user.full_name || '').trim().split(' ');
   const name = nameParts[0] || '';
   const surname = nameParts.slice(1).join(' ') || '';

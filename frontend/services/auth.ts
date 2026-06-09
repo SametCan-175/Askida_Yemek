@@ -88,3 +88,9 @@ export async function updateMyProfile(data: UserUpdateData): Promise<User> {
     requireAuth: true,
   });
 }
+export async function deleteMyAccount(): Promise<{ message: string }> {
+  return await api<{ message: string }>('/users/me', {
+    method: 'DELETE',
+    requireAuth: true,
+  });
+}
