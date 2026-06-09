@@ -10,6 +10,7 @@ logger = logging.getLogger("SonLokma.Notification")
 
 BACKEND_URL = "http://127.0.0.1:8000"
 BILDIRIM_ENDPOINT = f"{BACKEND_URL}/notifications/send"
+TIMEOUT = 10  # saniye
 
 
 def _bildirim_gonder(user_id: int, baslik: str, mesaj: str, tip: str, ekstra: dict = None):
@@ -23,18 +24,17 @@ def _bildirim_gonder(user_id: int, baslik: str, mesaj: str, tip: str, ekstra: di
     }
 
     try:
-        response = requests.post(BILDIRIM_ENDPOINT, json=payload)
+        response = requests.post(BILDIRIM_ENDPOINT, json=payload, timeout=TIMEOUT)
         response.raise_for_status()
         logger.info(f"🔔 Bildirim gönderildi → user:{user_id} tip:{tip}")
         return True
+    except requests.exceptions.Timeout:
+        logger.error(f"❌ Bildirim zaman aşımı ({TIMEOUT}s) → user:{user_id} tip:{tip}")
+        return False
     except requests.exceptions.RequestException as e:
         logger.error(f"❌ Bildirim gönderilemedi → user:{user_id} tip:{tip} hata:{e}")
         return False
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 1. AI TABANLı KİŞİSELLEŞTİRİLMİŞ BİLDİRİMLER
-# ─────────────────────────────────────────────────────────────────────────────
 
 def bildir_ai_oneri(user_id: int, kullanici_adi: str, firsat: dict):
     urun = firsat.get("urun", "")
@@ -46,10 +46,7 @@ def bildir_ai_oneri(user_id: int, kullanici_adi: str, firsat: dict):
     mesaj = ai_description if ai_description else f"{kafe}'da {urun} — %{indirim} indirim!"
 
     return _bildirim_gonder(
-        user_id=user_id,
-        baslik=baslik,
-        mesaj=mesaj,
-        tip="ai_oneri",
+        user_id=user_id, baslik=baslik, mesaj=mesaj, tip="ai_oneri",
         ekstra={
             "listing_id": firsat.get("listing_id"),
             "ai_score": firsat.get("ai_score"),
@@ -63,40 +60,20 @@ def bildir_gunun_firsati(user_id: int, firsat: dict, kart_metni: str):
     mesaj = kart_metni if kart_metni else f"{firsat.get('urun')} — kaçırma!"
 
     return _bildirim_gonder(
-        user_id=user_id,
-        baslik=baslik,
-        mesaj=mesaj,
-        tip="gunun_firsati",
-        ekstra={
-            "listing_id": firsat.get("id"),
-            "ai_score": firsat.get("firsat_skoru"),
-        }
+        user_id=user_id, baslik=baslik, mesaj=mesaj, tip="gunun_firsati",
+        ekstra={"listing_id": firsat.get("id"), "ai_score": firsat.get("firsat_skoru")}
     )
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 2. ROZET BİLDİRİMLERİ
-# ─────────────────────────────────────────────────────────────────────────────
 
 def bildir_rozet(user_id: int, kullanici_adi: str, rozet: dict, kutlama_mesaji: str):
     baslik = f"{rozet['emoji']} Yeni Rozet Kazandın!"
     mesaj = kutlama_mesaji if kutlama_mesaji else f"{rozet['ad']} rozetini kazandın!"
 
     return _bildirim_gonder(
-        user_id=user_id,
-        baslik=baslik,
-        mesaj=mesaj,
-        tip="rozet",
-        ekstra={
-            "rozet_id": rozet.get("id"),
-            "badge_text": f"{rozet.get('emoji')} {rozet.get('ad')}",
-        }
+        user_id=user_id, baslik=baslik, mesaj=mesaj, tip="rozet",
+        ekstra={"rozet_id": rozet.get("id"), "badge_text": f"{rozet.get('emoji')} {rozet.get('ad')}"}
     )
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 3. REZERVASYON BİLDİRİMLERİ
-# ─────────────────────────────────────────────────────────────────────────────
 
 def bildir_rezervasyon_onaylandi(user_id: int, rezervasyon: dict):
     urun = rezervasyon.get("urun", "")
@@ -107,10 +84,7 @@ def bildir_rezervasyon_onaylandi(user_id: int, rezervasyon: dict):
         baslik="✅ Rezervasyonun Onaylandı!",
         mesaj=f"{kafe}'daki {urun} siparişin onaylandı. Yemeğin seni bekliyor!",
         tip="rezervasyon",
-        ekstra={
-            "listing_id": rezervasyon.get("id"),
-            "badge_text": "Onaylandı",
-        }
+        ekstra={"listing_id": rezervasyon.get("id"), "badge_text": "Onaylandı"}
     )
 
 
@@ -123,10 +97,7 @@ def bildir_rezervasyon_iptal(user_id: int, rezervasyon: dict):
         baslik="❌ Rezervasyonun İptal Edildi",
         mesaj=f"{kafe}'daki {urun} rezervasyonun iptal edildi. Başka fırsatlara göz at!",
         tip="rezervasyon",
-        ekstra={
-            "listing_id": rezervasyon.get("id"),
-            "badge_text": "İptal",
-        }
+        ekstra={"listing_id": rezervasyon.get("id"), "badge_text": "İptal"}
     )
 
 
@@ -139,16 +110,9 @@ def bildir_isletmeye_rezervasyon(isletme_user_id: int, rezervasyon: dict):
         baslik="🛎️ Yeni Rezervasyon!",
         mesaj=f"{kullanici_adi} — {urun} için rezervasyon yaptı.",
         tip="rezervasyon",
-        ekstra={
-            "listing_id": rezervasyon.get("id"),
-            "badge_text": "Yeni",
-        }
+        ekstra={"listing_id": rezervasyon.get("id"), "badge_text": "Yeni"}
     )
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 4. KONUM BAZLI TETİKLEYİCİLER
-# ─────────────────────────────────────────────────────────────────────────────
 
 def bildir_yakinlik(user_id: int, firsat: dict, mesafe_km: float, esik_km: float = 0.3):
     if mesafe_km > esik_km:
@@ -163,16 +127,9 @@ def bildir_yakinlik(user_id: int, firsat: dict, mesafe_km: float, esik_km: float
         baslik="📍 Fırsat Çok Yakında!",
         mesaj=f"{kafe} sadece {mesafe_m} metre uzağında! {urun} seni bekliyor.",
         tip="yakinlik",
-        ekstra={
-            "listing_id": firsat.get("id"),
-            "badge_text": f"{mesafe_m}m",
-        }
+        ekstra={"listing_id": firsat.get("id"), "badge_text": f"{mesafe_m}m"}
     )
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 5. STOK VE KRİTİK UYARILAR
-# ─────────────────────────────────────────────────────────────────────────────
 
 def bildir_stok_azaliyor(user_id: int, firsat: dict, kalan_adet: int, esik: int = 2):
     if kalan_adet > esik:
@@ -186,8 +143,5 @@ def bildir_stok_azaliyor(user_id: int, firsat: dict, kalan_adet: int, esik: int 
         baslik="⚡ Son Birkaç Porsiyon!",
         mesaj=f"{kafe}'da {urun} — sadece {kalan_adet} porsiyon kaldı, acele et!",
         tip="stok_uyari",
-        ekstra={
-            "listing_id": firsat.get("id"),
-            "badge_text": f"Son {kalan_adet}",
-        }
+        ekstra={"listing_id": firsat.get("id"), "badge_text": f"Son {kalan_adet}"}
     )
